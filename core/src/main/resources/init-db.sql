@@ -136,3 +136,103 @@ CREATE INDEX IF NOT EXISTS idx_user_memory_client_user
 -- conversation_turn
 CREATE INDEX IF NOT EXISTS idx_conversation_turn_session
     ON conversation_turn (session_id);
+
+-- =============================================================================
+-- Pipeline tables: intent/slot/state machine
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS service_intent (
+    id          BIGSERIAL PRIMARY KEY,
+    client_id   VARCHAR(255) NOT NULL,
+    service_id  BIGINT,
+    intent_slug VARCHAR(255) NOT NULL,
+    intent_type VARCHAR(100),
+    intent_response TEXT,
+    summary_prompt  TEXT,
+    UNIQUE(client_id, intent_slug)
+);
+
+CREATE TABLE IF NOT EXISTS service_intent_question (
+    service_intent_id BIGINT REFERENCES service_intent(id) ON DELETE CASCADE,
+    question TEXT
+);
+
+CREATE TABLE IF NOT EXISTS integrated_service (
+    id                   BIGSERIAL PRIMARY KEY,
+    client_id            VARCHAR(255),
+    name                 VARCHAR(255),
+    endpoint             TEXT,
+    method               VARCHAR(20)  DEFAULT 'POST',
+    headers              TEXT,
+    system_prompt        TEXT,
+    slot_identify_prompt TEXT,
+    summary_prompt       TEXT,
+    bot_response_template TEXT,
+    enabled              BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS service_parameter (
+    id                  BIGSERIAL PRIMARY KEY,
+    service_id          BIGINT REFERENCES integrated_service(id) ON DELETE CASCADE,
+    name                VARCHAR(255) NOT NULL,
+    param_type          VARCHAR(100) DEFAULT 'string',
+    required            BOOLEAN DEFAULT TRUE,
+    question_to_get_input TEXT,
+    default_value       TEXT,
+    is_auth_parameter   BOOLEAN DEFAULT FALSE,
+    date_format         VARCHAR(100),
+    sequence            INTEGER DEFAULT 0,
+    allowed_values      TEXT,
+    hint                TEXT,
+    dependent_service_id BIGINT,
+    mapping_rules       TEXT,
+    enable_llm_fallback BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS slot_item (
+    id               BIGSERIAL PRIMARY KEY,
+    request_id       VARCHAR(255),
+    name             VARCHAR(255),
+    param_type       VARCHAR(100),
+    question         TEXT,
+    slot_value       TEXT,
+    required         BOOLEAN,
+    is_auth_parameter BOOLEAN DEFAULT FALSE,
+    default_value    TEXT,
+    date_format      VARCHAR(100),
+    is_current_slot  BOOLEAN DEFAULT FALSE,
+    sequence         INTEGER DEFAULT 0,
+    allowed_values   TEXT,
+    hint             TEXT
+);
+
+CREATE TABLE IF NOT EXISTS conversation_state (
+    request_id    VARCHAR(255) PRIMARY KEY,
+    session_id    VARCHAR(255),
+    client_id     VARCHAR(255),
+    state         VARCHAR(50),
+    state_sub_type VARCHAR(50),
+    input_text    TEXT,
+    intent_slug   VARCHAR(255),
+    service_id    BIGINT,
+    intent_response TEXT,
+    summary_prompt  TEXT,
+    slots_json    TEXT,
+    created_at    TIMESTAMP DEFAULT NOW(),
+    updated_at    TIMESTAMP,
+    completed     BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS slot_rule (
+    id                   BIGSERIAL PRIMARY KEY,
+    service_parameter_id BIGINT REFERENCES service_parameter(id) ON DELETE CASCADE,
+    condition_expression TEXT,
+    set_expression       TEXT,
+    target_field         VARCHAR(255),
+    priority             INTEGER DEFAULT 0,
+    active               BOOLEAN DEFAULT TRUE
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversation_state_session ON conversation_state(session_id, completed);
+CREATE INDEX IF NOT EXISTS idx_slot_item_request ON slot_item(request_id);
+CREATE INDEX IF NOT EXISTS idx_service_intent_client ON service_intent(client_id);
