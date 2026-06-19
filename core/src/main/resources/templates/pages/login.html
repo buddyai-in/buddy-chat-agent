@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sign In — BuddyAI Agent</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --color-primary: #6366f1;
+      --color-primary-dark: #4f46e5;
+      --color-danger: #ef4444;
+      --color-border: #e2e8f0;
+      --color-surface: #ffffff;
+      --color-surface-2: #f1f5f9;
+      --color-text: #0f172a;
+      --color-text-muted: #64748b;
+      --color-text-light: #94a3b8;
+      --color-bg: #f8fafc;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 20px;
+      --radius-full: 9999px;
+      --shadow-xl: 0 16px 48px rgba(0,0,0,.16);
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --transition: 150ms cubic-bezier(.4,0,.2,1);
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      background: var(--color-bg);
+      color: var(--color-text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background-image:
+        radial-gradient(ellipse at 20% 20%, rgba(99,102,241,.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(139,92,246,.08) 0%, transparent 50%);
+    }
+
+    .login-wrapper {
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .login-logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .login-logo-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      background: var(--color-primary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin-bottom: 14px;
+      box-shadow: 0 8px 24px rgba(99,102,241,.4);
+    }
+
+    .login-logo h1 {
+      font-size: 22px;
+      font-weight: 700;
+      margin: 0 0 4px;
+      color: var(--color-text);
+    }
+
+    .login-logo p {
+      font-size: 14px;
+      color: var(--color-text-muted);
+      margin: 0;
+    }
+
+    .login-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-xl);
+      padding: 36px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: var(--color-text);
+    }
+
+    .form-control {
+      display: block;
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-family: var(--font-sans);
+      color: var(--color-text);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      appearance: none;
+    }
+
+    .form-control:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+    }
+
+    .form-control::placeholder {
+      color: var(--color-text-light);
+    }
+
+    .input-group {
+      position: relative;
+      display: flex;
+    }
+
+    .input-group .form-control {
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+      flex: 1;
+    }
+
+    .input-group-addon {
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border);
+      border-left: none;
+      border-top-right-radius: var(--radius-md);
+      border-bottom-right-radius: var(--radius-md);
+      cursor: pointer;
+      color: var(--color-text-muted);
+      transition: color var(--transition);
+    }
+
+    .input-group-addon:hover { color: var(--color-text); }
+
+    .btn-login {
+      display: block;
+      width: 100%;
+      padding: 11px 24px;
+      font-size: 15px;
+      font-family: var(--font-sans);
+      font-weight: 600;
+      color: #fff;
+      background: var(--color-primary);
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: background var(--transition), box-shadow var(--transition), transform var(--transition);
+      margin-top: 8px;
+    }
+
+    .btn-login:hover {
+      background: var(--color-primary-dark);
+      box-shadow: 0 4px 12px rgba(99,102,241,.4);
+    }
+
+    .btn-login:active {
+      transform: scale(0.98);
+    }
+
+    .btn-login:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .error-box {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      background: rgba(239,68,68,.1);
+      border: 1px solid rgba(239,68,68,.3);
+      border-radius: var(--radius-md);
+      padding: 11px 14px;
+      color: #991b1b;
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+
+    .error-box i { flex-shrink: 0; margin-top: 1px; }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--color-border);
+    }
+
+    .divider span {
+      font-size: 12px;
+      color: var(--color-text-light);
+      white-space: nowrap;
+    }
+
+    .login-footer {
+      text-align: center;
+      margin-top: 28px;
+      font-size: 12px;
+      color: var(--color-text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .login-footer a {
+      color: var(--color-primary);
+      text-decoration: none;
+    }
+
+    .login-footer a:hover {
+      text-decoration: underline;
+    }
+
+    ::selection { background: rgba(99,102,241,.2); }
+    :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  </style>
+</head>
+<body>
+
+<div class="login-wrapper">
+
+  <!-- Logo -->
+  <div class="login-logo">
+    <div class="login-logo-icon">🤖</div>
+    <h1>BuddyAI Agent</h1>
+    <p>Admin Portal — Sign in to manage your agent</p>
+  </div>
+
+  <!-- Card -->
+  <div class="login-card">
+
+    <!-- Error message -->
+    <div class="error-box" th:if="${error}">
+      <i class="bi bi-x-circle-fill"></i>
+      <span th:text="${error}">Invalid credentials. Please try again.</span>
+    </div>
+    <div class="error-box" th:if="${param.error != null}" th:unless="${error}">
+      <i class="bi bi-x-circle-fill"></i>
+      <span>Invalid Client ID or Secret Key. Please try again.</span>
+    </div>
+
+    <!-- Login Form -->
+    <form th:action="@{/ui/login}" method="post" id="login-form">
+      <input type="hidden" name="_csrf" th:value="${_csrf?.token}"/>
+
+      <div class="form-group">
+        <label class="form-label" for="clientId">Client ID</label>
+        <div style="position:relative">
+          <input type="text" class="form-control" id="clientId" name="clientId"
+                 placeholder="your-agent-client-id"
+                 th:value="${lastClientId}"
+                 autocomplete="username"
+                 autofocus
+                 required
+                 style="padding-left:38px"/>
+          <i class="bi bi-person-circle" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--color-text-muted);pointer-events:none"></i>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="secretKey">
+          Secret Key
+          <a th:href="@{/ui/settings#auth}" style="float:right;font-size:12px;color:var(--color-primary);text-decoration:none;font-weight:400">
+            Manage Keys
+          </a>
+        </label>
+        <div class="input-group">
+          <input type="password" class="form-control" id="secretKey" name="secretKey"
+                 placeholder="sk-••••••••••••••••••••••"
+                 autocomplete="current-password"
+                 required/>
+          <span class="input-group-addon" onclick="togglePassword()" title="Show/hide">
+            <i class="bi bi-eye" id="pwd-icon"></i>
+          </span>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--color-text-muted)">
+          <input type="checkbox" name="rememberMe" value="true"
+                 style="width:15px;height:15px;accent-color:var(--color-primary);cursor:pointer"/>
+          Keep me signed in
+        </label>
+      </div>
+
+      <button class="btn-login" type="submit" id="submit-btn">
+        <i class="bi bi-box-arrow-in-right" style="margin-right:6px"></i>
+        Sign In
+      </button>
+    </form>
+
+    <div class="divider"><span>or</span></div>
+
+    <!-- Quick links -->
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <a href="/manage/health" target="_blank"
+         style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--color-border);border-radius:var(--radius-md);text-decoration:none;color:var(--color-text-muted);font-size:13px;transition:background var(--transition),color var(--transition)"
+         onmouseover="this.style.background='var(--color-surface-2)';this.style.color='var(--color-text)'"
+         onmouseout="this.style.background='';this.style.color='var(--color-text-muted)'">
+        <i class="bi bi-heart-pulse" style="color:#10b981;font-size:16px"></i>
+        <span>Check System Health</span>
+        <i class="bi bi-box-arrow-up-right" style="margin-left:auto;font-size:11px;opacity:.5"></i>
+      </a>
+      <a href="https://github.com/your-org/buddy-chat-agent" target="_blank" rel="noopener"
+         style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--color-border);border-radius:var(--radius-md);text-decoration:none;color:var(--color-text-muted);font-size:13px;transition:background var(--transition),color var(--transition)"
+         onmouseover="this.style.background='var(--color-surface-2)';this.style.color='var(--color-text)'"
+         onmouseout="this.style.background='';this.style.color='var(--color-text-muted)'">
+        <i class="bi bi-github" style="font-size:16px"></i>
+        <span>Documentation &amp; Source</span>
+        <i class="bi bi-box-arrow-up-right" style="margin-left:auto;font-size:11px;opacity:.5"></i>
+      </a>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="login-footer">
+    <div>BuddyAI Agent Admin Portal</div>
+    <div>
+      <a href="/manage/health">Health</a> ·
+      <a href="https://github.com/your-org/buddy-chat-agent/wiki" target="_blank" rel="noopener">Docs</a> ·
+      <a href="https://github.com/your-org/buddy-chat-agent/issues" target="_blank" rel="noopener">Support</a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function togglePassword() {
+  var input = document.getElementById('secretKey');
+  var icon = document.getElementById('pwd-icon');
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.className = 'bi bi-eye-slash';
+  } else {
+    input.type = 'password';
+    icon.className = 'bi bi-eye';
+  }
+}
+
+document.getElementById('login-form').addEventListener('submit', function() {
+  var btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px"></span> Signing in…';
+});
+
+// Keyframe
+var s = document.createElement('style');
+s.textContent = '@keyframes spin { to { transform: rotate(360deg) } }';
+document.head.appendChild(s);
+</script>
+</body>
+</html>

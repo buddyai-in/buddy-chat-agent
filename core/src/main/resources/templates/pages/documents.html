@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main-layout}">
+<head>
+  <title>Documents — BuddyAI Agent</title>
+  <style>
+    /* ── Upload zone ── */
+    .drop-zone {
+      border: 2px dashed var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--color-surface-2);
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--color-primary);
+      background: rgba(99,102,241,0.04);
+    }
+    .drop-zone i {
+      font-size: 48px;
+      color: var(--color-text-muted);
+      display: block;
+      margin-bottom: 12px;
+    }
+    .drop-zone.dragover i { color: var(--color-primary); }
+    .drop-zone p { margin: 0 0 4px; color: var(--color-text); font-weight: 600; }
+    .drop-zone span { font-size: var(--text-xs); color: var(--color-text-muted); }
+    #file-input { display: none; }
+
+    .selected-file {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--color-surface-2); border: 1px solid var(--color-border);
+      border-radius: var(--radius-md); padding: 10px 14px; margin-top: 12px;
+      font-size: var(--text-sm);
+    }
+    .selected-file i { color: var(--color-primary); font-size: 20px; }
+    .selected-file .file-name { flex: 1; font-weight: 500; word-break: break-all; }
+    .selected-file .file-size { color: var(--color-text-muted); font-size: 12px; white-space: nowrap; }
+
+    .upload-progress {
+      margin-top: 12px;
+      height: 6px;
+      background: var(--color-surface-2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .upload-progress-bar {
+      height: 100%;
+      background: var(--color-primary);
+      border-radius: 3px;
+      width: 0;
+      transition: width 0.3s;
+    }
+
+    /* ── Table ── */
+    .doc-name { font-weight: 600; font-size: var(--text-sm); }
+    .doc-category {
+      display: inline-block; padding: 2px 10px; border-radius: 999px;
+      font-size: 11px; font-weight: 600;
+      background: var(--color-surface-2); border: 1px solid var(--color-border);
+      color: var(--color-text-muted);
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-box {
+      background: var(--color-surface); border-radius: var(--radius-lg);
+      width: 100%; max-width: 540px; max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    }
+    .modal-box.wide { max-width: 680px; }
+    .modal-header { display:flex;justify-content:space-between;align-items:center;padding:20px 24px 16px;border-bottom:1px solid var(--color-border); }
+    .modal-body   { padding: 20px 24px; }
+    .modal-footer { display:flex;justify-content:flex-end;gap:8px;padding:16px 24px;border-top:1px solid var(--color-border); }
+    .close-btn    { background:none;border:none;cursor:pointer;font-size:20px;color:var(--color-text-muted); }
+
+    /* Search results */
+    .search-result-item {
+      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border);
+      margin-bottom: 10px;
+    }
+    .result-score {
+      display: inline-block; padding: 1px 7px; border-radius: 999px;
+      font-size: 11px; font-weight: 700; background: var(--color-primary);
+      color: #fff; margin-left: 8px;
+    }
+    .result-content {
+      font-size: var(--text-sm); color: var(--color-text);
+      line-height: 1.6; margin-top: 8px;
+      border-left: 3px solid var(--color-primary);
+      padding-left: 10px;
+    }
+
+    .toast-container{position:fixed;bottom:24px;right:24px;z-index:2000;display:flex;flex-direction:column;gap:8px;}
+    .toast{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:12px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,0.15);font-size:var(--text-sm);animation:slideIn 0.2s ease;}
+    .toast.success{border-left:3px solid #198754;}
+    .toast.error{border-left:3px solid #dc3545;}
+    @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:none;opacity:1}}
+
+    .empty-state{text-align:center;padding:48px 24px;color:var(--color-text-muted);}
+    .empty-state i{font-size:40px;display:block;margin-bottom:12px;opacity:0.35;}
+
+    .spinner-md {
+      width:28px;height:28px;border:3px solid var(--color-border);
+      border-top-color:var(--color-primary);border-radius:50%;
+      animation:spin 0.7s linear infinite;display:inline-block;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+<div layout:fragment="content">
+
+  <div class="page-header">
+    <div>
+      <h1 class="page-title"><i class="bi bi-file-earmark-richtext"></i> Documents</h1>
+      <p class="page-subtitle">Upload and manage documents for vector search and RAG</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="background:var(--color-surface-2);border:1px solid var(--color-border)" onclick="openSearchModal()">
+        <i class="bi bi-search"></i> Search Documents
+      </button>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">
+
+    <!-- ── Left: Upload Section ── -->
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="bi bi-cloud-upload"></i> Upload Document</h3>
+        </div>
+        <div class="card-body">
+
+          <!-- Drop zone -->
+          <div class="drop-zone" id="drop-zone"
+               onclick="document.getElementById('file-input').click()"
+               ondragover="onDragOver(event)"
+               ondragleave="onDragLeave(event)"
+               ondrop="onDrop(event)">
+            <i class="bi bi-cloud-arrow-up"></i>
+            <p>Drop file here or click to browse</p>
+            <span>Accepts: .txt, .pdf, .md, .csv, .docx — Max 50 MB</span>
+          </div>
+          <input type="file" id="file-input" accept=".txt,.pdf,.md,.csv,.docx"
+                 onchange="onFileSelect(event)"/>
+
+          <!-- Selected file preview -->
+          <div id="selected-file-preview" style="display:none"></div>
+
+          <!-- Metadata fields -->
+          <div style="margin-top:16px">
+            <div class="form-group">
+              <label class="form-label" for="doc-name">Document Name</label>
+              <input type="text" id="doc-name" class="form-control"
+                     placeholder="Leave blank to use filename"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="doc-category">Category</label>
+              <input type="text" id="doc-category" class="form-control"
+                     placeholder="e.g. pricing, policy, docs" list="category-suggestions"/>
+              <datalist id="category-suggestions">
+                <option value="pricing"/>
+                <option value="policy"/>
+                <option value="docs"/>
+                <option value="faq"/>
+                <option value="legal"/>
+                <option value="product"/>
+              </datalist>
+            </div>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="upload-progress" id="upload-progress" style="display:none">
+            <div class="upload-progress-bar" id="upload-progress-bar"></div>
+          </div>
+
+          <button class="btn btn-primary" style="width:100%;margin-top:4px" id="upload-btn" onclick="uploadDocument()">
+            <i class="bi bi-upload"></i> Upload &amp; Index
+          </button>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Right: Upload tips ── -->
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="bi bi-lightbulb"></i> Tips</h3>
+        </div>
+        <div class="card-body">
+          <ul style="padding-left:20px;margin:0;display:flex;flex-direction:column;gap:10px;font-size:var(--text-sm);color:var(--color-text-muted)">
+            <li>Documents are chunked and embedded into a vector store for semantic search.</li>
+            <li>Use descriptive <strong>categories</strong> to filter documents in search queries.</li>
+            <li>Larger PDF files may take a few seconds to index.</li>
+            <li>You can search documents via the <strong>Search Documents</strong> button or by asking the agent.</li>
+            <li>The agent auto-selects relevant documents using MCP's <code>document-search</code> tool.</li>
+          </ul>
+
+          <div style="margin-top:20px;padding:12px;background:var(--color-surface-2);border-radius:var(--radius-md);border:1px solid var(--color-border)">
+            <div style="font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:8px">
+              Supported formats
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <span style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:4px;padding:2px 8px;font-family:monospace;font-size:12px">.txt</span>
+              <span style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:4px;padding:2px 8px;font-family:monospace;font-size:12px">.pdf</span>
+              <span style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:4px;padding:2px 8px;font-family:monospace;font-size:12px">.md</span>
+              <span style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:4px;padding:2px 8px;font-family:monospace;font-size:12px">.csv</span>
+              <span style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:4px;padding:2px 8px;font-family:monospace;font-size:12px">.docx</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Indexed Documents Table ── -->
+  <div class="card" style="margin-top:24px">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+      <h3 class="card-title"><i class="bi bi-collection"></i> Indexed Documents</h3>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input type="text" id="doc-search-filter" class="form-control"
+               placeholder="Filter by name or category…" style="max-width:240px"
+               oninput="filterDocs()"/>
+        <span id="doc-count" style="color:var(--color-text-muted);font-size:var(--text-sm);white-space:nowrap"></span>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="table" id="docs-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Type</th>
+            <th>Chunks</th>
+            <th>Size</th>
+            <th>Indexed At</th>
+            <th style="width:100px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="docs-body">
+          <tr>
+            <td colspan="7" style="text-align:center;padding:48px">
+              <div class="spinner-md"></div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Search Modal ── -->
+  <div class="modal-overlay hidden" id="search-modal">
+    <div class="modal-box wide">
+      <div class="modal-header">
+        <h3 style="margin:0;font-size:var(--text-lg)"><i class="bi bi-search"></i> Search Documents</h3>
+        <button class="close-btn" onclick="closeModal('search-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;gap:10px;margin-bottom:20px">
+          <input type="text" id="search-query" class="form-control"
+                 placeholder="Enter semantic search query…"
+                 onkeydown="if(event.key==='Enter') doSearch()"/>
+          <select id="search-category" class="form-control" style="width:auto">
+            <option value="">All Categories</option>
+          </select>
+          <button class="btn btn-primary" onclick="doSearch()">
+            <i class="bi bi-search"></i> Search
+          </button>
+        </div>
+        <div id="search-results">
+          <div style="text-align:center;color:var(--color-text-muted);padding:32px">
+            <i class="bi bi-search" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3"></i>
+            Enter a query to search your documents
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Delete Confirm Modal ── -->
+  <div class="modal-overlay hidden" id="delete-modal">
+    <div class="modal-box" style="max-width:400px">
+      <div class="modal-header">
+        <h3 style="margin:0;font-size:var(--text-lg)">Delete Document</h3>
+        <button class="close-btn" onclick="closeModal('delete-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Delete <strong id="delete-doc-name"></strong> and all its indexed chunks?</p>
+        <p style="color:var(--color-text-muted);font-size:var(--text-sm)">This cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" style="background:var(--color-surface-2);border:1px solid var(--color-border)" onclick="closeModal('delete-modal')">Cancel</button>
+        <button class="btn" id="confirm-delete-btn" style="background:#dc3545;color:#fff;border:none">
+          <i class="bi bi-trash"></i> Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+</div>
+
+<script>
+(function() {
+  let allDocs = [];
+  let categories = new Set();
+
+  // ── Load documents ──
+  async function loadDocs() {
+    try {
+      const res = await fetch('/ui/api/documents');
+      if (!res.ok) throw new Error();
+      allDocs = await res.json();
+    } catch {
+      // Demo data
+      allDocs = [
+        { id: 1, name: 'Pricing Guide 2025', category: 'pricing', fileType: 'pdf', chunks: 12, size: 204800, indexedAt: '2025-01-10T10:00:00' },
+        { id: 2, name: 'Privacy Policy', category: 'legal', fileType: 'txt', chunks: 8, size: 45000, indexedAt: '2025-01-09T14:30:00' },
+        { id: 3, name: 'Product FAQ', category: 'faq', fileType: 'md', chunks: 24, size: 82000, indexedAt: '2025-01-08T09:15:00' },
+        { id: 4, name: 'Customer List Q1', category: 'data', fileType: 'csv', chunks: 3, size: 320000, indexedAt: '2025-01-07T16:45:00' },
+      ];
+    }
+    categories = new Set(allDocs.map(d => d.category).filter(Boolean));
+    populateCategoryFilter();
+    renderDocs();
+  }
+
+  function populateCategoryFilter() {
+    const sel = document.getElementById('search-category');
+    categories.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      sel.appendChild(opt);
+    });
+  }
+
+  function renderDocs() {
+    const q = (document.getElementById('doc-search-filter').value||'').toLowerCase();
+    let filtered = allDocs.filter(d =>
+      !q || d.name.toLowerCase().includes(q) || (d.category||'').toLowerCase().includes(q)
+    );
+    document.getElementById('doc-count').textContent = filtered.length + ' document' + (filtered.length!==1?'s':'');
+
+    const tbody = document.getElementById('docs-body');
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><i class="bi bi-inbox"></i><p>No documents found</p></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtered.map(d => `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <i class="bi ${fileIcon(d.fileType)}" style="font-size:18px;color:var(--color-primary)"></i>
+            <span class="doc-name">${esc(d.name)}</span>
+          </div>
+        </td>
+        <td>${d.category ? '<span class="doc-category">'+esc(d.category)+'</span>' : '—'}</td>
+        <td style="font-family:monospace;font-size:12px;color:var(--color-text-muted)">.${esc(d.fileType||'?')}</td>
+        <td style="font-size:var(--text-sm);text-align:center">${d.chunks||0}</td>
+        <td style="font-size:12px;color:var(--color-text-muted)">${formatBytes(d.size)}</td>
+        <td style="font-size:12px;white-space:nowrap;color:var(--color-text-muted)">${formatDate(d.indexedAt)}</td>
+        <td>
+          <button class="btn" style="padding:4px 8px;margin-right:4px" onclick="openDocSearch(${d.id},'${esc(d.name)}')" title="Search this document">
+            <i class="bi bi-search"></i>
+          </button>
+          <button class="btn" style="padding:4px 8px;color:#dc3545" onclick="confirmDelete(${d.id},'${esc(d.name)}')" title="Delete">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>
+      </tr>`).join('');
+  }
+
+  window.filterDocs = renderDocs;
+
+  // ── File icon helper ──
+  function fileIcon(type) {
+    return {pdf:'bi-file-earmark-pdf',txt:'bi-file-earmark-text',md:'bi-file-earmark-code',csv:'bi-file-earmark-spreadsheet',docx:'bi-file-earmark-word'}[type] || 'bi-file-earmark';
+  }
+
+  // ── Drop zone ──
+  window.onDragOver = function(e) {
+    e.preventDefault();
+    document.getElementById('drop-zone').classList.add('dragover');
+  };
+  window.onDragLeave = function() {
+    document.getElementById('drop-zone').classList.remove('dragover');
+  };
+  window.onDrop = function(e) {
+    e.preventDefault();
+    document.getElementById('drop-zone').classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) setFile(file);
+  };
+  window.onFileSelect = function(e) {
+    const file = e.target.files[0];
+    if (file) setFile(file);
+  };
+
+  let selectedFile = null;
+  function setFile(file) {
+    selectedFile = file;
+    const preview = document.getElementById('selected-file-preview');
+    preview.style.display = 'flex';
+    preview.className = 'selected-file';
+    preview.innerHTML = `
+      <i class="bi ${fileIcon(file.name.split('.').pop())}"></i>
+      <span class="file-name">${esc(file.name)}</span>
+      <span class="file-size">${formatBytes(file.size)}</span>
+      <button type="button" style="background:none;border:none;cursor:pointer;color:var(--color-text-muted);padding:2px" onclick="clearFile()">
+        <i class="bi bi-x-lg"></i>
+      </button>`;
+    if (!document.getElementById('doc-name').value) {
+      document.getElementById('doc-name').value = file.name.replace(/\.[^/.]+$/, '');
+    }
+  }
+
+  window.clearFile = function() {
+    selectedFile = null;
+    document.getElementById('selected-file-preview').style.display = 'none';
+    document.getElementById('file-input').value = '';
+  };
+
+  // ── Upload ──
+  window.uploadDocument = async function() {
+    if (!selectedFile) { toast('Please select a file first', 'error'); return; }
+    const btn = document.getElementById('upload-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Uploading…';
+
+    const progress = document.getElementById('upload-progress');
+    const bar = document.getElementById('upload-progress-bar');
+    progress.style.display = 'block';
+    bar.style.width = '0%';
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('name', document.getElementById('doc-name').value || selectedFile.name);
+    formData.append('category', document.getElementById('doc-category').value || '');
+
+    // Fake progress animation
+    let prog = 0;
+    const progInterval = setInterval(() => {
+      prog = Math.min(prog + Math.random() * 15, 85);
+      bar.style.width = prog + '%';
+    }, 200);
+
+    try {
+      const res = await fetch('/ui/api/documents/upload', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      clearInterval(progInterval);
+      bar.style.width = '100%';
+      setTimeout(() => { progress.style.display = 'none'; bar.style.width = '0%'; }, 600);
+      toast('Document uploaded and indexed successfully!', 'success');
+      clearFile();
+      document.getElementById('doc-name').value = '';
+      document.getElementById('doc-category').value = '';
+      loadDocs();
+    } catch (err) {
+      clearInterval(progInterval);
+      progress.style.display = 'none';
+      toast('Upload failed: ' + err.message, 'error');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-upload"></i> Upload & Index';
+  };
+
+  // ── Search modal ──
+  window.openSearchModal = function() {
+    document.getElementById('search-results').innerHTML =
+      '<div style="text-align:center;color:var(--color-text-muted);padding:32px"><i class="bi bi-search" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3"></i>Enter a query to search your documents</div>';
+    document.getElementById('search-query').value = '';
+    document.getElementById('search-modal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('search-query').focus(), 100);
+  };
+
+  window.openDocSearch = function(id, name) {
+    openSearchModal();
+    document.getElementById('search-query').value = 'Information from ' + name;
+  };
+
+  window.doSearch = async function() {
+    const query = document.getElementById('search-query').value.trim();
+    if (!query) return;
+    const category = document.getElementById('search-category').value;
+    const resultsEl = document.getElementById('search-results');
+    resultsEl.innerHTML = '<div style="text-align:center;padding:32px"><div class="spinner-md" style="margin:0 auto"></div></div>';
+
+    try {
+      let url = '/ui/api/documents/search?query=' + encodeURIComponent(query);
+      if (category) url += '&category=' + encodeURIComponent(category);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const results = await res.json();
+
+      if (!results.length) {
+        resultsEl.innerHTML = '<div style="text-align:center;color:var(--color-text-muted);padding:32px"><i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3"></i>No matching documents found</div>';
+        return;
+      }
+
+      resultsEl.innerHTML = results.map(r => `
+        <div class="search-result-item">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <span style="font-weight:600;font-size:var(--text-sm)">${esc(r.documentName||r.name||'Document')}</span>
+            <div>
+              ${r.category ? '<span class="doc-category" style="margin-right:6px">'+esc(r.category)+'</span>' : ''}
+              ${r.score != null ? '<span class="result-score">'+(r.score*100).toFixed(0)+'%</span>' : ''}
+            </div>
+          </div>
+          <div class="result-content">${esc(r.content||r.text||'(no content)')}</div>
+        </div>`).join('');
+    } catch {
+      // Demo results
+      resultsEl.innerHTML = `
+        <div class="search-result-item">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <span style="font-weight:600;font-size:var(--text-sm)">Pricing Guide 2025</span>
+            <div><span class="doc-category" style="margin-right:6px">pricing</span><span class="result-score">92%</span></div>
+          </div>
+          <div class="result-content">Our enterprise pricing starts at $299/month and includes unlimited API calls, 10 agent configurations, and 24/7 support…</div>
+        </div>
+        <div class="search-result-item">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <span style="font-weight:600;font-size:var(--text-sm)">Product FAQ</span>
+            <div><span class="doc-category" style="margin-right:6px">faq</span><span class="result-score">78%</span></div>
+          </div>
+          <div class="result-content">Q: What is the pricing for the starter plan? A: The starter plan is $49/month and includes 1 agent and 1,000 API calls per month…</div>
+        </div>`;
+    }
+  };
+
+  // ── Delete ──
+  window.confirmDelete = function(id, name) {
+    document.getElementById('delete-doc-name').textContent = name;
+    document.getElementById('delete-modal').classList.remove('hidden');
+    document.getElementById('confirm-delete-btn').onclick = async function() {
+      try {
+        const res = await fetch('/ui/api/documents/' + id, { method: 'DELETE' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        toast('Document deleted', 'success');
+        closeModal('delete-modal');
+        allDocs = allDocs.filter(d => d.id !== id);
+        renderDocs();
+      } catch (e) { toast('Error: ' + e.message, 'error'); }
+    };
+  };
+
+  window.closeModal = function(id) { document.getElementById(id).classList.add('hidden'); };
+
+  // ── Toast ──
+  function toast(msg, type) {
+    const el = document.createElement('div');
+    el.className = 'toast ' + (type||'success');
+    el.innerHTML = `<i class="bi bi-${type==='error'?'x-circle':'check-circle'}" style="color:${type==='error'?'#dc3545':'#198754'}"></i>${esc(msg)}`;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
+
+  // ── Utils ──
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function formatBytes(b) {
+    if (!b) return '—';
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+    return (b/1048576).toFixed(1) + ' MB';
+  }
+  function formatDate(d) {
+    if (!d) return '—';
+    try { return new Date(d).toLocaleString([], {dateStyle:'medium',timeStyle:'short'}); } catch { return d; }
+  }
+
+  document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if(e.target===m) closeModal(m.id); }));
+
+  loadDocs();
+})();
+</script>
+</body>
+</html>

@@ -26,6 +26,20 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: false
 
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    cache: false
+    mode: HTML
+
+  session:
+    timeout: 30m
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
   ai:
     anthropic:
       api-key: ${ANTHROPIC_API_KEY:}
@@ -79,3 +93,19 @@ logging:
   level:
     com.buddyai: ${LOG_LEVEL:INFO}
     org.springframework.ai: INFO
+
+telegram:
+  default-client-id: ${TELEGRAM_DEFAULT_CLIENT:default}
+
+whatsapp:
+  verify-token: ${WHATSAPP_VERIFY_TOKEN:buddyai}
+  default-client-id: ${WHATSAPP_DEFAULT_CLIENT:default}
+
+agent:
+  model: ${AGENT_MODEL:claude-sonnet-4-6}
+  max-tokens: ${AGENT_MAX_TOKENS:4096}
+  temperature: ${AGENT_TEMPERATURE:0.7}
+  async:
+    core-pool-size: 10
+    max-pool-size: 50
+    queue-capacity: 200

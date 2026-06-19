@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main-layout}">
+<head>
+  <title>Settings</title>
+  <style>
+    .settings-layout { display: grid; grid-template-columns: 220px 1fr; gap: 24px; }
+    .settings-nav { display: flex; flex-direction: column; gap: 2px; }
+    .settings-nav-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 12px; border-radius: var(--radius-sm);
+      font-size: var(--text-sm); font-weight: 500; color: var(--color-text-muted);
+      cursor: pointer; text-decoration: none; border: none; background: none;
+      transition: background var(--transition), color var(--transition);
+    }
+    .settings-nav-item:hover { background: var(--color-surface-2); color: var(--color-text); }
+    .settings-nav-item.active { background: rgba(99,102,241,.1); color: var(--color-primary); }
+    .settings-section { display: none; }
+    .settings-section.active { display: block; }
+    @media (max-width: 768px) { .settings-layout { grid-template-columns: 1fr; } .settings-nav { flex-direction: row; flex-wrap: wrap; } }
+  </style>
+</head>
+<body>
+
+<div layout:fragment="breadcrumb">
+  <div class="breadcrumb">
+    <a th:href="@{/ui/dashboard}"><i class="bi bi-house"></i></a>
+    <span class="breadcrumb-sep">/</span>
+    <span class="breadcrumb-current">Settings</span>
+  </div>
+</div>
+
+<div layout:fragment="content">
+
+  <div class="page-header">
+    <div class="page-header-text">
+      <h1 class="page-title">Settings</h1>
+      <p class="page-subtitle">Configure your BuddyAI agent platform</p>
+    </div>
+  </div>
+
+  <div class="settings-layout">
+
+    <!-- Settings Nav -->
+    <div>
+      <div class="card" style="padding:8px">
+        <div class="settings-nav">
+          <button class="settings-nav-item active" onclick="showSection('llm', this)" type="button">
+            <i class="bi bi-robot"></i> LLM Configuration
+          </button>
+          <button class="settings-nav-item" onclick="showSection('mcp', this)" type="button">
+            <i class="bi bi-hdd-network"></i> MCP Servers
+          </button>
+          <button class="settings-nav-item" onclick="showSection('auth', this)" type="button">
+            <i class="bi bi-key"></i> Auth Keys
+          </button>
+          <button class="settings-nav-item" onclick="showSection('notifications', this)" type="button">
+            <i class="bi bi-bell"></i> Notifications
+          </button>
+          <button class="settings-nav-item" onclick="showSection('agent', this)" type="button">
+            <i class="bi bi-sliders"></i> Agent Behavior
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Panels -->
+    <div>
+
+      <!-- ===== LLM Configuration ===== -->
+      <div class="settings-section active" id="section-llm">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title"><i class="bi bi-robot"></i> LLM Configuration</h3>
+          </div>
+          <div class="card-body">
+            <form th:action="@{/ui/settings/llm}" method="post">
+              <input type="hidden" name="_csrf" th:value="${_csrf?.token}"/>
+
+              <div class="form-group">
+                <label class="form-label required">Model</label>
+                <select class="form-control" name="model">
+                  <option value="claude-opus-4-5" th:selected="${settings?.model == 'claude-opus-4-5'}">Claude Opus 4.5 (Most Capable)</option>
+                  <option value="claude-sonnet-4-5" th:selected="${settings?.model == 'claude-sonnet-4-5'}">Claude Sonnet 4.5 (Balanced)</option>
+                  <option value="claude-haiku-4-5" th:selected="${settings?.model == 'claude-haiku-4-5'}">Claude Haiku 4.5 (Fastest)</option>
+                  <option value="claude-3-5-sonnet-20241022" th:selected="${settings?.model == 'claude-3-5-sonnet-20241022'}">Claude 3.5 Sonnet</option>
+                  <option value="claude-3-5-haiku-20241022" th:selected="${settings?.model == 'claude-3-5-haiku-20241022'}">Claude 3.5 Haiku</option>
+                </select>
+                <div class="form-text">The LLM model powering your agent</div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Max Tokens</label>
+                <input type="number" class="form-control" name="maxTokens"
+                       th:value="${settings?.maxTokens ?: 4096}"
+                       min="256" max="200000" step="256"/>
+                <div class="form-text">Maximum tokens in each agent response (256–200000)</div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" style="display:flex;justify-content:space-between">
+                  Temperature
+                  <span id="temp-display" style="font-weight:600;color:var(--color-primary)"
+                        th:text="${settings?.temperature ?: 0.7}">0.7</span>
+                </label>
+                <input type="range" name="temperature" min="0" max="1" step="0.05"
+                       th:value="${settings?.temperature ?: 0.7}"
+                       style="width:100%;accent-color:var(--color-primary)"
+                       oninput="document.getElementById('temp-display').textContent = this.value"/>
+                <div style="display:flex;justify-content:space-between">
+                  <span style="font-size:var(--text-xs);color:var(--color-text-muted)">0 — Deterministic</span>
+                  <span style="font-size:var(--text-xs);color:var(--color-text-muted)">1 — Creative</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">System Prompt</label>
+                <textarea class="form-control" name="systemPrompt" rows="5"
+                          th:text="${settings?.systemPrompt}"
+                          placeholder="You are BuddyAI, a helpful assistant. You have access to various tools..."></textarea>
+                <div class="form-text">Custom instructions given to the agent at the start of every conversation</div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Max Agentic Iterations</label>
+                  <input type="number" class="form-control" name="maxIterations"
+                         th:value="${settings?.maxIterations ?: 10}" min="1" max="50"/>
+                  <div class="form-text">Max tool-call cycles per turn</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Session Timeout (minutes)</label>
+                  <input type="number" class="form-control" name="sessionTimeoutMinutes"
+                         th:value="${settings?.sessionTimeoutMinutes ?: 60}" min="5" max="10080"/>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="btn btn-primary" type="submit">
+                  <i class="bi bi-check-lg"></i> Save LLM Config
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== MCP Servers ===== -->
+      <div class="settings-section" id="section-mcp">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title"><i class="bi bi-hdd-network"></i> MCP Servers</h3>
+            <button class="btn btn-primary btn-sm" type="button" onclick="openModal('add-mcp-modal')">
+              <i class="bi bi-plus-lg"></i> Add Server
+            </button>
+          </div>
+          <div class="card-body">
+            <div th:each="mcp : ${mcpServers}"
+                 style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--color-surface-2);border-radius:var(--radius-md);margin-bottom:8px;border:1px solid var(--color-border)">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0"
+                     th:style="${mcp.connected} ? 'background:var(--color-success)' : 'background:var(--color-danger)'"></div>
+                <div>
+                  <div style="font-weight:600;font-size:var(--text-sm)" th:text="${mcp.name}">server</div>
+                  <div style="font-size:var(--text-xs);color:var(--color-text-muted);font-family:var(--font-mono)" th:text="${mcp.url ?: mcp.command}">stdio://...</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:var(--text-xs);color:var(--color-text-muted)"
+                      th:text="${mcp.toolCount + ' tools'}">0 tools</span>
+                <span class="badge badge-success" th:if="${mcp.connected}">UP</span>
+                <span class="badge badge-danger" th:unless="${mcp.connected}">DOWN</span>
+                <button class="btn btn-ghost btn-icon" title="Edit URL"
+                        th:onclick="|editMcpUrl('${mcp.id}', '${mcp.name}', '${mcp.url}')|">
+                  <i class="bi bi-pencil" style="font-size:13px"></i>
+                </button>
+              </div>
+            </div>
+            <div th:if="${mcpServers == null or #lists.isEmpty(mcpServers)}" class="empty-state" style="padding:32px">
+              <div class="empty-state-icon"><i class="bi bi-hdd-network"></i></div>
+              <h3>No MCP Servers</h3>
+              <p>Add API services or database connections to register MCP tools.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Auth Keys ===== -->
+      <div class="settings-section" id="section-auth">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title"><i class="bi bi-key"></i> Client Auth Keys</h3>
+            <button class="btn btn-primary btn-sm" type="button" onclick="openModal('add-key-modal')">
+              <i class="bi bi-plus-lg"></i> Generate Key
+            </button>
+          </div>
+          <div class="card-body">
+            <div class="table-container" style="border:none">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Client ID</th>
+                    <th>Secret Key</th>
+                    <th>Created</th>
+                    <th>Last Used</th>
+                    <th style="width:100px">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr th:each="key : ${authKeys}">
+                    <td>
+                      <span style="font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600"
+                            th:text="${key.clientId}">client-id</span>
+                    </td>
+                    <td>
+                      <div class="copy-row">
+                        <input type="text" class="form-control" readonly
+                               th:value="${key.maskedKey ?: '••••••••••••••••••••••••'}"
+                               th:id="|key-${key.id}|" style="font-family:var(--font-mono);font-size:var(--text-xs)"/>
+                        <button class="btn btn-ghost btn-icon" title="Copy key"
+                                th:onclick="|copyToClipboard('${key.secretKey}')|">
+                          <i class="bi bi-copy" style="font-size:13px"></i>
+                        </button>
+                      </div>
+                    </td>
+                    <td>
+                      <span style="font-size:var(--text-xs);color:var(--color-text-muted)"
+                            th:text="${key.createdAt != null ? #temporals.format(key.createdAt,'MMM dd, yyyy') : '-'}">-</span>
+                    </td>
+                    <td>
+                      <span style="font-size:var(--text-xs);color:var(--color-text-muted)"
+                            th:text="${key.lastUsedAt != null ? #temporals.format(key.lastUsedAt,'MMM dd, HH:mm') : 'Never'}">Never</span>
+                    </td>
+                    <td>
+                      <div class="td-actions">
+                        <button class="btn btn-ghost btn-sm" title="Regenerate key"
+                                th:onclick="|regenerateKey('${key.id}', '${key.clientId}')|">
+                          <i class="bi bi-arrow-repeat"></i>
+                        </button>
+                        <button class="btn btn-ghost btn-icon" title="Delete" style="color:var(--color-danger)"
+                                th:onclick="|deleteKey('${key.id}', '${key.clientId}')|">
+                          <i class="bi bi-trash3" style="font-size:13px"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr th:if="${authKeys == null or #lists.isEmpty(authKeys)}">
+                    <td colspan="5">
+                      <div class="empty-state" style="padding:24px">
+                        <div class="empty-state-icon"><i class="bi bi-key"></i></div>
+                        <h3 style="font-size:var(--text-base)">No Keys</h3>
+                        <p>Generate an API key to authenticate agent requests.</p>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Notifications ===== -->
+      <div class="settings-section" id="section-notifications">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title"><i class="bi bi-bell"></i> Notification Settings</h3>
+          </div>
+          <div class="card-body">
+            <form th:action="@{/ui/settings/notifications}" method="post">
+              <input type="hidden" name="_csrf" th:value="${_csrf?.token}"/>
+
+              <div style="margin-bottom:20px">
+                <div class="section-title">Telegram</div>
+                <div class="form-group">
+                  <label class="form-label">Bot Token</label>
+                  <div class="input-group">
+                    <input type="password" class="form-control" name="telegramBotToken"
+                           id="telegram-token"
+                           th:value="${notifSettings?.telegramBotToken}"
+                           placeholder="123456789:ABCdef…"/>
+                    <span class="input-group-addon" onclick="togglePwd('telegram-token', this)">
+                      <i class="bi bi-eye"></i>
+                    </span>
+                  </div>
+                  <div class="form-text">Get from @BotFather on Telegram</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Webhook URL (auto-registered)</label>
+                  <input type="text" class="form-control" readonly
+                         th:value="${baseUrl + '/v1/webhook/telegram/' + (clientId ?: 'your-client-id')}"
+                         style="font-family:var(--font-mono);font-size:var(--text-xs)"/>
+                </div>
+                <div class="form-group">
+                  <label class="toggle-switch">
+                    <input type="checkbox" name="telegramEnabled" value="true"
+                           th:checked="${notifSettings?.telegramEnabled}"/>
+                    <span class="toggle-track"></span>
+                    <span class="form-label" style="margin:0">Enable Telegram channel</span>
+                  </label>
+                </div>
+              </div>
+
+              <hr class="divider"/>
+
+              <div style="margin-bottom:20px">
+                <div class="section-title">WhatsApp (via Twilio)</div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Account SID</label>
+                    <input type="text" class="form-control" name="twilioAccountSid"
+                           th:value="${notifSettings?.twilioAccountSid}"
+                           placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"/>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Auth Token</label>
+                    <div class="input-group">
+                      <input type="password" class="form-control" name="twilioAuthToken"
+                             id="twilio-token"
+                             th:value="${notifSettings?.twilioAuthToken}"
+                             placeholder="Your Auth Token"/>
+                      <span class="input-group-addon" onclick="togglePwd('twilio-token', this)">
+                        <i class="bi bi-eye"></i>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">WhatsApp From Number</label>
+                  <input type="text" class="form-control" name="whatsappFrom"
+                         th:value="${notifSettings?.whatsappFrom}"
+                         placeholder="+14155238886"/>
+                </div>
+                <div class="form-group">
+                  <label class="toggle-switch">
+                    <input type="checkbox" name="whatsappEnabled" value="true"
+                           th:checked="${notifSettings?.whatsappEnabled}"/>
+                    <span class="toggle-track"></span>
+                    <span class="form-label" style="margin:0">Enable WhatsApp channel</span>
+                  </label>
+                </div>
+              </div>
+
+              <button class="btn btn-primary" type="submit">
+                <i class="bi bi-check-lg"></i> Save Notification Settings
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Agent Behavior ===== -->
+      <div class="settings-section" id="section-agent">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title"><i class="bi bi-sliders"></i> Agent Behavior</h3>
+          </div>
+          <div class="card-body">
+            <form th:action="@{/ui/settings/agent}" method="post">
+              <input type="hidden" name="_csrf" th:value="${_csrf?.token}"/>
+
+              <div class="form-group">
+                <label class="form-label">Agent Name</label>
+                <input type="text" class="form-control" name="agentName"
+                       th:value="${settings?.agentName ?: 'BuddyAI'}"
+                       placeholder="BuddyAI"/>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Agent Description</label>
+                <textarea class="form-control" name="agentDescription" rows="2"
+                          th:text="${settings?.agentDescription}"
+                          placeholder="A helpful AI assistant with access to various tools."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label class="toggle-switch">
+                  <input type="checkbox" name="memoryEnabled" value="true"
+                         th:checked="${settings?.memoryEnabled != false}"/>
+                  <span class="toggle-track"></span>
+                  <span class="form-label" style="margin:0">Enable user memory persistence</span>
+                </label>
+                <div class="form-text" style="margin-top:6px">Agent will remember facts about users across sessions</div>
+              </div>
+
+              <div class="form-group">
+                <label class="toggle-switch">
+                  <input type="checkbox" name="auditLogging" value="true"
+                         th:checked="${settings?.auditLogging != false}"/>
+                  <span class="toggle-track"></span>
+                  <span class="form-label" style="margin:0">Enable audit logging</span>
+                </label>
+                <div class="form-text" style="margin-top:6px">Log all messages and tool calls for compliance and debugging</div>
+              </div>
+
+              <div class="form-group">
+                <label class="toggle-switch">
+                  <input type="checkbox" name="streamingEnabled" value="true"
+                         th:checked="${settings?.streamingEnabled}"/>
+                  <span class="toggle-track"></span>
+                  <span class="form-label" style="margin:0">Enable streaming responses</span>
+                </label>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Allowed Channels</label>
+                <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:4px">
+                  <label class="form-check">
+                    <input type="checkbox" name="channels" value="REST" th:checked="${true}"/> REST API
+                  </label>
+                  <label class="form-check">
+                    <input type="checkbox" name="channels" value="TELEGRAM"
+                           th:checked="${settings?.channels?.contains('TELEGRAM')}"/> Telegram
+                  </label>
+                  <label class="form-check">
+                    <input type="checkbox" name="channels" value="WHATSAPP"
+                           th:checked="${settings?.channels?.contains('WHATSAPP')}"/> WhatsApp
+                  </label>
+                  <label class="form-check">
+                    <input type="checkbox" name="channels" value="SLACK"
+                           th:checked="${settings?.channels?.contains('SLACK')}"/> Slack
+                  </label>
+                </div>
+              </div>
+
+              <button class="btn btn-primary" type="submit">
+                <i class="bi bi-check-lg"></i> Save Agent Settings
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /settings panels -->
+  </div><!-- /settings-layout -->
+
+</div>
+
+<!-- Add Key Modal -->
+<div class="modal-overlay" id="add-key-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2><i class="bi bi-key" style="color:var(--color-primary)"></i> Generate API Key</h2>
+      <button class="modal-close" type="button" onclick="closeModal('add-key-modal')"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <form th:action="@{/ui/settings/keys/generate}" method="post">
+      <input type="hidden" name="_csrf" th:value="${_csrf?.token}"/>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label required">Client ID</label>
+          <input type="text" class="form-control" name="clientId" placeholder="my-app-client" required/>
+          <div class="form-text">Unique identifier for this client application</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <input type="text" class="form-control" name="description" placeholder="Production mobile app"/>
+        </div>
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle-fill"></i>
+          The generated secret key will only be shown once. Copy it and store it securely.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" type="button" onclick="closeModal('add-key-modal')">Cancel</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-key"></i> Generate Key</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<th:block layout:fragment="scripts">
+<script>
+function showSection(name, btn) {
+  document.querySelectorAll('.settings-section').forEach(function(s) { s.classList.remove('active'); });
+  document.querySelectorAll('.settings-nav-item').forEach(function(b) { b.classList.remove('active'); });
+  var section = document.getElementById('section-' + name);
+  if (section) section.classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+function togglePwd(id, el) {
+  var inp = document.getElementById(id);
+  if (!inp) return;
+  var show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  el.querySelector('i').className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
+}
+
+function editMcpUrl(id, name, url) {
+  var newUrl = prompt('Edit URL for "' + name + '":', url || '');
+  if (newUrl === null) return;
+  fetch('/ui/settings/mcp/' + id + '/url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: newUrl })
+  }).then(function(r) {
+    if (r.ok) { showToast('URL updated', 'success'); setTimeout(function() { location.reload(); }, 600); }
+    else showToast('Update failed', 'error');
+  });
+}
+
+function regenerateKey(id, clientId) {
+  if (!confirmAction('Regenerate key for "' + clientId + '"? The old key will stop working immediately.')) return;
+  fetch('/ui/settings/keys/' + id + '/regenerate', { method: 'POST' })
+    .then(function(r) {
+      if (r.ok) { showToast('Key regenerated — reload to see new value', 'success'); setTimeout(function() { location.reload(); }, 800); }
+      else showToast('Failed to regenerate', 'error');
+    });
+}
+
+function deleteKey(id, clientId) {
+  if (!confirmAction('Delete key for "' + clientId + '"? This cannot be undone.')) return;
+  var form = document.createElement('form');
+  form.method = 'post';
+  form.action = '/ui/settings/keys/' + id + '/delete';
+  document.body.appendChild(form);
+  form.submit();
+}
+
+// Navigate to section from hash
+(function() {
+  var hash = window.location.hash.replace('#', '');
+  if (hash) {
+    var btn = document.querySelector('[onclick*="' + hash + '"]');
+    if (btn) btn.click();
+  }
+})();
+</script>
+</th:block>
+</body>
+</html>

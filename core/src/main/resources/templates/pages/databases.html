@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main-layout}">
+<head><title>Databases</title></head>
+<body>
+
+<div layout:fragment="breadcrumb">
+  <div class="breadcrumb">
+    <a th:href="@{/ui/dashboard}"><i class="bi bi-house"></i></a>
+    <span class="breadcrumb-sep">/</span>
+    <span class="breadcrumb-current">Databases</span>
+  </div>
+</div>
+
+<div layout:fragment="content">
+
+  <div class="page-header">
+    <div class="page-header-text">
+      <h1 class="page-title">Database Connections</h1>
+      <p class="page-subtitle">Manage relational database connections the agent can query via MCP tools</p>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn-primary" type="button" onclick="openModal('add-db-modal')">
+        <i class="bi bi-plus-lg"></i> Add Connection
+      </button>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-container">
+    <table class="data-table" id="db-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Host</th>
+          <th>Database</th>
+          <th>Port</th>
+          <th>Status</th>
+          <th style="width:130px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="db : ${databases}">
+          <td>
+            <div style="font-weight:600;font-size:var(--text-sm)" th:text="${db.name}">db-name</div>
+            <div style="font-size:var(--text-xs);color:var(--color-text-muted)" th:text="${db.description}">description</div>
+          </td>
+          <td>
+            <span class="badge"
+                  th:classappend="${db.dbType == 'POSTGRESQL'} ? 'badge-info' : (${db.dbType == 'MYSQL'} ? 'badge-warning' : 'badge-secondary')"
+                  th:text="${db.dbType}">POSTGRESQL</span>
+          </td>
+          <td><span class="td-mono" th:text="${db.host}">localhost</span></td>
+          <td><span style="font-size:var(--text-sm);font-weight:500" th:text="${db.dbName}">mydb</span></td>
+          <td><span class="td-mono" th:text="${db.port}">5432</span></td>
+          <td>
+            <span class="badge badge-success" th:if="${db.lastTestSuccess}">
+              <i class="bi bi-circle-fill" style="font-size:6px"></i> Connected
+            </span>
+            <span class="badge badge-danger" th:if="${!db.lastTestSuccess and db.lastTestSuccess != null}">
+              <i class="bi bi-circle-fill" style="font-size:6px"></i> Failed
+            </span>
+            <span class="badge" th:if="${db.lastTestSuccess == null}">Untested</span>
+          </td>
+          <td>
+            <div class="td-actions">
+              <button class="btn btn-secondary btn-sm" type="button"
+                      th:onclick="|testConnection('${db.id}', this)|"
+                      title="Test Connection">
+                <i class="bi bi-wifi"></i> Test
+              </button>
+              <button class="btn btn-ghost btn-icon" title="Edit"
+                      th:onclick="|openEditDbModal('${db.id}', '${db.name}', '${db.dbType}', '${db.host}', ${db.port}, '${db.dbName}', '${db.username}', '${db.description}')|">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-ghost btn-icon" title="Delete" style="color:var(--color-danger)"
+                      th:onclick="|deleteDb('${db.id}', '${db.name}')|">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        <tr th:if="${databases == null or #lists.isEmpty(databases)}">
+          <td colspan="7">
+            <div class="empty-state">
+              <div class="empty-state-icon"><i class="bi bi-database"></i></div>
+              <h3>No Database Connections</h3>
+              <p>Connect a database so the agent can query it using natural language.</p>
+              <button class="btn btn-primary" onclick="openModal('add-db-modal')" type="button">
+                <i class="bi bi-plus-lg"></i> Add Connection
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- =================== ADD DB MODAL =================== -->
+<div class="modal-overlay" id="add-db-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2><i class="bi bi-database-fill" style="color:var(--color-primary)"></i> Add Database Connection</h2>
+      <button class="modal-close" type="button" onclick="closeModal('add-db-modal')"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <form th:action="@{/ui/databases}" method="post">
+      <input type="hidden" name="_csrf" th:value="${_csrf?.token}"/>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label required">Connection Name</label>
+          <input type="text" class="form-control" name="name" placeholder="e.g. production-db" required/>
+          <div class="form-text">Used as MCP tool identifier</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" name="description" rows="2"
+                    placeholder="What data does this database contain?"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Database Type</label>
+            <select class="form-control" name="dbType" required>
+              <option value="POSTGRESQL">PostgreSQL</option>
+              <option value="MYSQL">MySQL</option>
+              <option value="MSSQL">Microsoft SQL Server</option>
+              <option value="MARIADB">MariaDB</option>
+              <option value="ORACLE">Oracle</option>
+              <option value="SQLITE">SQLite</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Port</label>
+            <input type="number" class="form-control" name="port" placeholder="5432" min="1" max="65535" required/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label required">Host</label>
+          <input type="text" class="form-control" name="host" placeholder="localhost or db.example.com" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label required">Database Name</label>
+          <input type="text" class="form-control" name="dbName" placeholder="my_database" required/>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Username</label>
+            <input type="text" class="form-control" name="username" placeholder="db_user" required autocomplete="username"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Password</label>
+            <div class="input-group">
+              <input type="password" class="form-control" name="password" id="add-db-password"
+                     placeholder="••••••••" required autocomplete="new-password"/>
+              <span class="input-group-addon" onclick="togglePwd('add-db-password', this)">
+                <i class="bi bi-eye"></i>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Additional JDBC Options</label>
+          <input type="text" class="form-control" name="jdbcOptions"
+                 placeholder="e.g. ?sslmode=require&connectTimeout=10"/>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" type="button" onclick="closeModal('add-db-modal')">Cancel</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Add Connection</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- =================== EDIT DB MODAL =================== -->
+<div class="modal-overlay" id="edit-db-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2><i class="bi bi-pencil" style="color:var(--color-primary)"></i> Edit Connection</h2>
+      <button class="modal-close" type="button" onclick="closeModal('edit-db-modal')"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <form th:action="@{/ui/databases/update}" method="post">
+      <input type="hidden" name="_csrf" th:value="${_csrf?.token}"/>
+      <input type="hidden" name="id" id="edit-db-id"/>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label required">Connection Name</label>
+          <input type="text" class="form-control" name="name" id="edit-db-name" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" name="description" id="edit-db-description" rows="2"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Type</label>
+            <select class="form-control" name="dbType" id="edit-db-type">
+              <option value="POSTGRESQL">PostgreSQL</option>
+              <option value="MYSQL">MySQL</option>
+              <option value="MSSQL">Microsoft SQL Server</option>
+              <option value="MARIADB">MariaDB</option>
+              <option value="ORACLE">Oracle</option>
+              <option value="SQLITE">SQLite</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Port</label>
+            <input type="number" class="form-control" name="port" id="edit-db-port" required/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label required">Host</label>
+          <input type="text" class="form-control" name="host" id="edit-db-host" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label required">Database Name</label>
+          <input type="text" class="form-control" name="dbName" id="edit-db-dbname" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label required">Username</label>
+          <input type="text" class="form-control" name="username" id="edit-db-username" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Password <span style="font-weight:400;color:var(--color-text-muted)">(leave blank to keep current)</span></label>
+          <div class="input-group">
+            <input type="password" class="form-control" name="password" id="edit-db-password"
+                   placeholder="Leave blank to keep current" autocomplete="new-password"/>
+            <span class="input-group-addon" onclick="togglePwd('edit-db-password', this)">
+              <i class="bi bi-eye"></i>
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" type="button" onclick="closeModal('edit-db-modal')">Cancel</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<th:block layout:fragment="scripts">
+<script th:inline="javascript">
+const CLIENT_ID = /*[[${clientId}]]*/ 'default';
+
+function testConnection(dbId, btn) {
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-sm"></span> Testing…';
+  fetch('/v1/agent/' + CLIENT_ID + '/mcp/database/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dbId: dbId })
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    if (data.success) {
+      showToast('Connection successful!', 'success');
+      btn.innerHTML = '<i class="bi bi-check-circle-fill" style="color:var(--color-success)"></i> OK';
+    } else {
+      showToast('Connection failed: ' + (data.error || 'Unknown error'), 'error');
+      btn.innerHTML = '<i class="bi bi-x-circle-fill" style="color:var(--color-danger)"></i> Failed';
+    }
+    setTimeout(function() {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-wifi"></i> Test';
+    }, 3000);
+  })
+  .catch(function(e) {
+    showToast('Test error: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-wifi"></i> Test';
+  });
+}
+
+function openEditDbModal(id, name, dbType, host, port, dbName, username, description) {
+  document.getElementById('edit-db-id').value = id;
+  document.getElementById('edit-db-name').value = name;
+  document.getElementById('edit-db-host').value = host;
+  document.getElementById('edit-db-port').value = port;
+  document.getElementById('edit-db-dbname').value = dbName;
+  document.getElementById('edit-db-username').value = username;
+  document.getElementById('edit-db-description').value = description;
+  var typeEl = document.getElementById('edit-db-type');
+  if (typeEl) { for (var o of typeEl.options) o.selected = o.value === dbType; }
+  openModal('edit-db-modal');
+}
+
+function deleteDb(id, name) {
+  if (!confirmAction('Delete connection "' + name + '"? This cannot be undone.')) return;
+  const form = document.createElement('form');
+  form.method = 'post';
+  form.action = '/ui/databases/delete';
+  const i = document.createElement('input'); i.type = 'hidden'; i.name = 'id'; i.value = id;
+  form.appendChild(i);
+  document.body.appendChild(form);
+  form.submit();
+}
+
+function togglePwd(id, iconEl) {
+  const inp = document.getElementById(id);
+  if (!inp) return;
+  const isPassword = inp.type === 'password';
+  inp.type = isPassword ? 'text' : 'password';
+  iconEl.querySelector('i').className = isPassword ? 'bi bi-eye-slash' : 'bi bi-eye';
+}
+</script>
+</th:block>
+</body>
+</html>

@@ -1,0 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import 'tokens.css';
+@import 'layout.css';
+@import 'components.css';
+
+/* ---- Global scrollbar ---- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+/* ---- Selection color ---- */
+::selection {
+  background: rgba(99, 102, 241, 0.2);
+  color: var(--color-text);
+}
+
+/* ---- Focus visible ---- */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ---- Placeholder ---- */
+::placeholder {
+  color: var(--color-text-light);
+  opacity: 1;
+}
+
+/* ---- Transitions for theme ---- */
+body,
+.sidebar,
+.top-bar,
+.card,
+.modal,
+.form-control,
+.btn,
+.badge {
+  transition-property: background-color, border-color, color;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}

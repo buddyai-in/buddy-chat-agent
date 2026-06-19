@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main-layout}">
+<head><title>User Memory</title></head>
+<body>
+
+<div layout:fragment="breadcrumb">
+  <div class="breadcrumb">
+    <a th:href="@{/ui/dashboard}"><i class="bi bi-house"></i></a>
+    <span class="breadcrumb-sep">/</span>
+    <span class="breadcrumb-current">Memory</span>
+  </div>
+</div>
+
+<div layout:fragment="content">
+
+  <div class="page-header">
+    <div class="page-header-text">
+      <h1 class="page-title">User Memory</h1>
+      <p class="page-subtitle">Facts and context the agent has learned and stored about users</p>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn-secondary" type="button" onclick="exportTableCSV('memory-table','memory-export')">
+        <i class="bi bi-download"></i> Export
+      </button>
+    </div>
+  </div>
+
+  <!-- Search by user -->
+  <div class="card" style="margin-bottom:20px;padding:16px">
+    <form th:action="@{/ui/memory}" method="get" style="display:flex;gap:10px;align-items:flex-end">
+      <div class="form-group" style="flex:1;margin:0">
+        <label class="form-label" for="user-search">Search by User ID</label>
+        <div class="search-input-wrapper">
+          <i class="bi bi-person-circle"></i>
+          <input type="text" class="form-control" id="user-search" name="userId"
+                 th:value="${searchUserId}"
+                 placeholder="Enter user ID to filter memories…"/>
+        </div>
+      </div>
+      <button class="btn btn-primary" type="submit" style="margin-bottom:0">
+        <i class="bi bi-search"></i> Search
+      </button>
+      <a th:if="${searchUserId}" th:href="@{/ui/memory}" class="btn btn-secondary">
+        <i class="bi bi-x"></i> Clear
+      </a>
+    </form>
+  </div>
+
+  <!-- Category Chips -->
+  <div class="chip-group" style="margin-bottom:16px">
+    <span style="font-size:var(--text-xs);font-weight:600;color:var(--color-text-muted);margin-right:4px">Filter:</span>
+    <button class="chip active" type="button" onclick="filterCategory(this, '')">
+      All <span th:text="${totalCount ?: 0}" style="opacity:.7">0</span>
+    </button>
+    <button class="chip" type="button" onclick="filterCategory(this, 'PREFERENCE')">
+      <i class="bi bi-heart"></i> Preferences
+    </button>
+    <button class="chip" type="button" onclick="filterCategory(this, 'HISTORY')">
+      <i class="bi bi-clock-history"></i> History
+    </button>
+    <button class="chip" type="button" onclick="filterCategory(this, 'PROFILE')">
+      <i class="bi bi-person-badge"></i> Profile
+    </button>
+    <button class="chip" type="button" onclick="filterCategory(this, 'CONTEXT')">
+      <i class="bi bi-diagram-3"></i> Context
+    </button>
+    <button class="chip" type="button" onclick="filterCategory(this, 'FACT')">
+      <i class="bi bi-bookmark"></i> Facts
+    </button>
+  </div>
+
+  <!-- Memory Table -->
+  <div class="table-container">
+    <table class="data-table" id="memory-table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Category</th>
+          <th>Key</th>
+          <th>Fact / Value</th>
+          <th>Confidence</th>
+          <th>Created</th>
+          <th style="width:80px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="mem : ${memories}" th:attr="data-category=${mem.category}">
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="width:24px;height:24px;border-radius:50%;background:var(--color-secondary);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0"
+                   th:text="${#strings.substring(mem.userId ?: 'U', 0, 1).toUpperCase()}">U</div>
+              <div>
+                <div style="font-size:var(--text-sm);font-weight:500" th:text="${mem.userId}">user-id</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="badge"
+                  th:classappend="${mem.category == 'PREFERENCE'} ? 'badge-secondary' : (${mem.category == 'PROFILE'} ? 'badge-info' : (${mem.category == 'HISTORY'} ? 'badge-warning' : (${mem.category == 'CONTEXT'} ? 'badge-primary' : '')))"
+                  th:text="${mem.category ?: 'FACT'}">FACT</span>
+          </td>
+          <td>
+            <span class="td-mono" style="font-size:var(--text-xs)" th:text="${mem.key ?: '-'}">key</span>
+          </td>
+          <td>
+            <div class="td-truncate" style="max-width:300px;font-size:var(--text-sm)"
+                 th:text="${mem.value}" th:title="${mem.value}">Memory fact content</div>
+          </td>
+          <td>
+            <div th:if="${mem.confidence != null}" style="display:flex;align-items:center;gap:6px">
+              <div style="flex:1;height:4px;background:var(--color-surface-2);border-radius:var(--radius-full);max-width:60px">
+                <div style="height:100%;border-radius:var(--radius-full);background:var(--color-success)"
+                     th:style="|width:${mem.confidence * 100}%|"></div>
+              </div>
+              <span style="font-size:var(--text-xs);color:var(--color-text-muted)"
+                    th:text="${#numbers.formatDecimal(mem.confidence * 100, 0, 0) + '%'}">100%</span>
+            </div>
+            <span th:unless="${mem.confidence != null}" style="color:var(--color-text-light);font-size:var(--text-xs)">—</span>
+          </td>
+          <td>
+            <div style="font-size:var(--text-xs);color:var(--color-text-muted)"
+                 th:text="${#temporals.format(mem.createdAt,'MMM dd, yyyy')}">Jan 01, 2025</div>
+            <div style="font-size:var(--text-xs);color:var(--color-text-light)"
+                 th:text="${#temporals.format(mem.createdAt,'HH:mm')}">00:00</div>
+          </td>
+          <td>
+            <button class="btn btn-ghost btn-icon" title="Delete memory" style="color:var(--color-danger)"
+                    th:onclick="|deleteMemory('${mem.id}', '${mem.userId}')|">
+              <i class="bi bi-trash3" style="font-size:13px"></i>
+            </button>
+          </td>
+        </tr>
+        <tr th:if="${memories == null or #lists.isEmpty(memories)}" id="empty-row">
+          <td colspan="7">
+            <div class="empty-state">
+              <div class="empty-state-icon"><i class="bi bi-cpu"></i></div>
+              <h3>No Memory Entries</h3>
+              <p th:if="${searchUserId}" th:text="|No memories found for user '${searchUserId}'.|">No memories found.</p>
+              <p th:unless="${searchUserId}">The agent hasn't stored any user memories yet. Start chatting to build context.</p>
+              <a th:href="@{/ui/playground}" class="btn btn-primary">
+                <i class="bi bi-chat-dots"></i> Start Chatting
+              </a>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination" th:if="${totalPages != null and totalPages > 1}">
+    <a class="page-btn" th:href="@{/ui/memory(page=${currentPage - 1},userId=${searchUserId})}"
+       th:classappend="${currentPage == 0} ? 'disabled' : ''">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <th:block th:each="p : ${#numbers.sequence(0, totalPages - 1)}">
+      <a class="page-btn" th:classappend="${p == currentPage} ? 'active' : ''"
+         th:href="@{/ui/memory(page=${p},userId=${searchUserId})}" th:text="${p + 1}">1</a>
+    </th:block>
+    <a class="page-btn" th:href="@{/ui/memory(page=${currentPage + 1},userId=${searchUserId})}"
+       th:classappend="${currentPage == totalPages - 1} ? 'disabled' : ''">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+
+</div>
+
+<th:block layout:fragment="scripts">
+<script>
+function filterCategory(btn, category) {
+  document.querySelectorAll('.chip').forEach(function(c) { c.classList.remove('active'); });
+  btn.classList.add('active');
+  var rows = document.querySelectorAll('#memory-table tbody tr:not(#empty-row)');
+  rows.forEach(function(row) {
+    var cat = row.getAttribute('data-category') || '';
+    row.style.display = (!category || cat === category) ? '' : 'none';
+  });
+}
+
+function deleteMemory(id, userId) {
+  if (!confirmAction('Delete this memory entry for user "' + userId + '"?')) return;
+  fetch('/ui/memory/' + id + '/delete', { method: 'POST' })
+    .then(function(r) {
+      if (r.ok) { showToast('Memory deleted', 'success'); setTimeout(function() { location.reload(); }, 600); }
+      else showToast('Failed to delete', 'error');
+    })
+    .catch(function(e) { showToast('Error: ' + e.message, 'error'); });
+}
+</script>
+</th:block>
+</body>
+</html>

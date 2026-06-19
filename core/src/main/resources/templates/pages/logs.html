@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main-layout}">
+<head><title>Audit Logs</title></head>
+<body>
+
+<div layout:fragment="breadcrumb">
+  <div class="breadcrumb">
+    <a th:href="@{/ui/dashboard}"><i class="bi bi-house"></i></a>
+    <span class="breadcrumb-sep">/</span>
+    <span class="breadcrumb-current">Audit Logs</span>
+  </div>
+</div>
+
+<div layout:fragment="content">
+
+  <div class="page-header">
+    <div class="page-header-text">
+      <h1 class="page-title">Audit Logs</h1>
+      <p class="page-subtitle">Complete history of agent interactions, tool calls, and errors</p>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn-secondary" type="button" onclick="exportTableCSV('logs-table','audit-logs')">
+        <i class="bi bi-download"></i> Export CSV
+      </button>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <div class="search-input-wrapper">
+      <i class="bi bi-search"></i>
+      <input type="text" class="form-control" id="search-input" placeholder="Search message, session, user…"
+             oninput="filterLogs()"/>
+    </div>
+    <select class="form-control" id="status-filter" onchange="filterLogs()" style="width:auto">
+      <option value="">All Status</option>
+      <option value="SUCCESS">Success</option>
+      <option value="ERROR">Error</option>
+    </select>
+    <select class="form-control" id="channel-filter" onchange="filterLogs()" style="width:auto">
+      <option value="">All Channels</option>
+      <option value="REST">REST</option>
+      <option value="TELEGRAM">Telegram</option>
+      <option value="WHATSAPP">WhatsApp</option>
+      <option value="SLACK">Slack</option>
+    </select>
+    <input type="date" class="form-control" id="date-from" style="width:auto" onchange="filterLogs()"/>
+    <input type="date" class="form-control" id="date-to" style="width:auto" onchange="filterLogs()"/>
+    <button class="btn btn-ghost" type="button" onclick="resetFilters()">
+      <i class="bi bi-arrow-counterclockwise"></i>
+    </button>
+    <span style="margin-left:auto;font-size:var(--text-sm);color:var(--color-text-muted)">
+      <span id="visible-count" th:text="${#lists.size(logs ?: {})}">0</span> entries
+    </span>
+  </div>
+
+  <!-- Table -->
+  <div class="table-container">
+    <table class="data-table" id="logs-table">
+      <thead>
+        <tr>
+          <th style="width:120px">Time</th>
+          <th>Session</th>
+          <th>User</th>
+          <th>User Message</th>
+          <th>Agent Response</th>
+          <th>Tools Used</th>
+          <th style="width:80px">Duration</th>
+          <th style="width:80px">Status</th>
+          <th style="width:44px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="log : ${logs}">
+          <td>
+            <div style="font-size:var(--text-xs);color:var(--color-text-muted);white-space:nowrap"
+                 th:text="${#temporals.format(log.createdAt,'MMM dd')}">Jan 01</div>
+            <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text)"
+                 th:text="${#temporals.format(log.createdAt,'HH:mm:ss')}">00:00:00</div>
+          </td>
+          <td>
+            <span class="td-mono" style="font-size:10px" th:text="${#strings.abbreviate(log.sessionId, 14)}">sess…</span>
+          </td>
+          <td>
+            <div style="display:flex;align-items:center;gap:5px">
+              <div style="width:20px;height:20px;border-radius:50%;background:var(--color-primary);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0"
+                   th:text="${#strings.substring(log.userId ?: 'U', 0, 1).toUpperCase()}">U</div>
+              <span style="font-size:var(--text-xs)" th:text="${log.userId ?: '-'}">user</span>
+            </div>
+          </td>
+          <td>
+            <div class="td-truncate" style="font-size:var(--text-sm);max-width:180px"
+                 th:text="${log.userMessage}" th:title="${log.userMessage}">User message</div>
+          </td>
+          <td>
+            <div class="td-truncate" style="font-size:var(--text-sm);color:var(--color-text-muted);max-width:180px"
+                 th:text="${log.agentResponse}" th:title="${log.agentResponse}">Agent response</div>
+          </td>
+          <td>
+            <div th:if="${log.toolsUsed != null and !log.toolsUsed.isEmpty()}"
+                 style="display:flex;flex-wrap:wrap;gap:3px;max-width:140px">
+              <span class="badge badge-secondary" th:each="tool : ${log.toolsUsed}"
+                    style="font-size:10px" th:text="${tool}">tool</span>
+            </div>
+            <span th:unless="${log.toolsUsed != null and !log.toolsUsed.isEmpty()}"
+                  style="font-size:var(--text-xs);color:var(--color-text-light)">—</span>
+          </td>
+          <td>
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs)"
+                  th:text="${log.durationMs != null ? log.durationMs + 'ms' : '-'}">-</span>
+          </td>
+          <td>
+            <span class="badge badge-success" th:if="${log.status == 'SUCCESS'}">OK</span>
+            <span class="badge badge-danger" th:unless="${log.status == 'SUCCESS'}" th:text="${log.status}">ERR</span>
+          </td>
+          <td>
+            <button class="btn btn-ghost btn-icon" title="View details"
+                    th:onclick="|showLogDetail('${log.id}')|">
+              <i class="bi bi-eye" style="font-size:13px"></i>
+            </button>
+          </td>
+        </tr>
+        <tr th:if="${logs == null or #lists.isEmpty(logs)}" id="empty-row">
+          <td colspan="9">
+            <div class="empty-state">
+              <div class="empty-state-icon"><i class="bi bi-journal-text"></i></div>
+              <h3>No Logs Yet</h3>
+              <p>Audit logs will appear here once the agent starts processing messages.</p>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination" th:if="${totalPages != null and totalPages > 1}">
+    <a class="page-btn" th:href="@{/ui/logs(page=${currentPage - 1})}"
+       th:classappend="${currentPage == 0} ? 'disabled' : ''">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <th:block th:each="p : ${#numbers.sequence(0, totalPages - 1)}">
+      <a class="page-btn" th:classappend="${p == currentPage} ? 'active' : ''"
+         th:href="@{/ui/logs(page=${p})}" th:text="${p + 1}">1</a>
+    </th:block>
+    <a class="page-btn" th:href="@{/ui/logs(page=${currentPage + 1})}"
+       th:classappend="${currentPage == totalPages - 1} ? 'disabled' : ''">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+    <span class="page-info" th:text="${'Showing page ' + (currentPage + 1) + ' of ' + totalPages}">Page 1</span>
+  </div>
+
+</div>
+
+<!-- Log Detail Modal -->
+<div class="modal-overlay" id="log-detail-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h2><i class="bi bi-journal-text" style="color:var(--color-primary)"></i> Log Entry Detail</h2>
+      <button class="modal-close" type="button" onclick="closeModal('log-detail-modal')">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="log-detail-content" style="display:flex;flex-direction:column;gap:14px">
+        <div class="spinner" style="margin:32px auto"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<th:block layout:fragment="scripts">
+<script th:inline="javascript">
+const CLIENT_ID = /*[[${clientId}]]*/ 'default';
+
+function filterLogs() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const status = document.getElementById('status-filter').value.toLowerCase();
+  const channel = document.getElementById('channel-filter').value.toLowerCase();
+  const rows = document.querySelectorAll('#logs-table tbody tr:not(#empty-row)');
+  let visible = 0;
+  rows.forEach(function(row) {
+    const text = row.textContent.toLowerCase();
+    const match = (!search || text.includes(search)) &&
+                  (!status || text.includes(status)) &&
+                  (!channel || text.includes(channel));
+    row.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  var vc = document.getElementById('visible-count');
+  if (vc) vc.textContent = visible;
+}
+
+function resetFilters() {
+  ['search-input','status-filter','channel-filter','date-from','date-to'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  filterLogs();
+}
+
+function showLogDetail(logId) {
+  openModal('log-detail-modal');
+  const content = document.getElementById('log-detail-content');
+  content.innerHTML = '<div class="spinner" style="margin:32px auto"></div>';
+  fetch('/ui/logs/' + logId + '/detail')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      content.innerHTML = `
+        <div>
+          <div class="info-label" style="margin-bottom:4px">User Message</div>
+          <div style="background:var(--color-surface-2);padding:12px;border-radius:var(--radius-md);font-size:var(--text-sm)">${escapeHtml(data.userMessage || '')}</div>
+        </div>
+        <div>
+          <div class="info-label" style="margin-bottom:4px">Agent Response</div>
+          <div style="background:var(--color-surface-2);padding:12px;border-radius:var(--radius-md);font-size:var(--text-sm)">${escapeHtml(data.agentResponse || '')}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div><div class="info-label">Status</div><div style="margin-top:4px"><span class="badge ${data.status === 'SUCCESS' ? 'badge-success' : 'badge-danger'}">${data.status || '-'}</span></div></div>
+          <div><div class="info-label">Duration</div><div style="font-weight:600;font-size:var(--text-sm);margin-top:4px">${data.durationMs != null ? data.durationMs + 'ms' : '-'}</div></div>
+          <div><div class="info-label">Channel</div><div style="margin-top:4px"><span class="badge badge-info">${data.channel || '-'}</span></div></div>
+        </div>
+        ${data.errorMessage ? '<div><div class="info-label" style="color:var(--color-danger);margin-bottom:4px">Error</div><div class="code-block" style="color:#fca5a5">' + escapeHtml(data.errorMessage) + '</div></div>' : ''}
+        ${data.toolCalls ? '<div><div class="info-label" style="margin-bottom:4px">Tool Calls</div><div class="code-block">' + escapeHtml(JSON.stringify(data.toolCalls, null, 2)) + '</div></div>' : ''}
+      `;
+    })
+    .catch(function(e) {
+      content.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle"></i> Failed to load: ' + e.message + '</div>';
+    });
+}
+
+function escapeHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</th:block>
+</body>
+</html>

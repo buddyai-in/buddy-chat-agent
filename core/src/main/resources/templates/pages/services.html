@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main-layout}">
+<head><title>API Services</title></head>
+<body>
+
+<div layout:fragment="breadcrumb">
+  <div class="breadcrumb">
+    <a th:href="@{/ui/dashboard}"><i class="bi bi-house"></i></a>
+    <span class="breadcrumb-sep">/</span>
+    <span class="breadcrumb-current">API Services</span>
+  </div>
+</div>
+
+<div layout:fragment="content">
+
+  <div class="page-header">
+    <div class="page-header-text">
+      <h1 class="page-title">API Services</h1>
+      <p class="page-subtitle">Configure external API endpoints exposed as MCP tools to the agent</p>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn-primary" type="button" onclick="openModal('add-service-modal')">
+        <i class="bi bi-plus-lg"></i> Add Service
+      </button>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <div class="search-input-wrapper">
+      <i class="bi bi-search"></i>
+      <input type="text" class="form-control" id="search-input" placeholder="Search services…"
+             oninput="filterTable()"/>
+    </div>
+    <select class="form-control" id="method-filter" onchange="filterTable()" style="width:auto">
+      <option value="">All Methods</option>
+      <option value="GET">GET</option>
+      <option value="POST">POST</option>
+      <option value="PUT">PUT</option>
+      <option value="DELETE">DELETE</option>
+    </select>
+    <select class="form-control" id="enabled-filter" onchange="filterTable()" style="width:auto">
+      <option value="">All Status</option>
+      <option value="true">Enabled</option>
+      <option value="false">Disabled</option>
+    </select>
+    <span style="margin-left:auto;font-size:var(--text-sm);color:var(--color-text-muted)">
+      <span id="visible-count" th:text="${#lists.size(services ?: {})}">0</span> services
+    </span>
+  </div>
+
+  <!-- Table -->
+  <div class="table-container">
+    <table class="data-table" id="services-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Endpoint</th>
+          <th>Method</th>
+          <th>Auth</th>
+          <th>Description</th>
+          <th>Status</th>
+          <th style="width:100px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="svc : ${services}">
+          <td>
+            <div style="font-weight:600;font-size:var(--text-sm)" th:text="${svc.name}">service-name</div>
+          </td>
+          <td>
+            <div class="td-mono td-truncate" th:text="${svc.endpoint}" style="max-width:220px">https://api.example.com/v1</div>
+          </td>
+          <td>
+            <span class="badge"
+                  th:classappend="${svc.method == 'GET'} ? 'badge-info' : (${svc.method == 'POST'} ? 'badge-success' : (${svc.method == 'DELETE'} ? 'badge-danger' : 'badge-warning'))"
+                  th:text="${svc.method}">GET</span>
+          </td>
+          <td>
+            <span class="badge" th:text="${svc.authType ?: 'NONE'}">NONE</span>
+          </td>
+          <td>
+            <div class="td-truncate" style="font-size:var(--text-sm);color:var(--color-text-muted)" th:text="${svc.description}">Description</div>
+          </td>
+          <td>
+            <span class="badge badge-success" th:if="${svc.enabled}"><i class="bi bi-circle-fill" style="font-size:6px"></i> Enabled</span>
+            <span class="badge" th:unless="${svc.enabled}"><i class="bi bi-circle-fill" style="font-size:6px"></i> Disabled</span>
+          </td>
+          <td>
+            <div class="td-actions">
+              <button class="btn btn-ghost btn-icon" title="Edit"
+                      th:onclick="|openEditModal('${svc.id}', '${svc.name}', '${svc.endpoint}', '${svc.method}', '${svc.description}', '${svc.authType}', ${svc.enabled})|">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-ghost btn-icon" title="Delete" style="color:var(--color-danger)"
+                      th:onclick="|deleteService('${svc.id}', '${svc.name}')|">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        <tr th:if="${services == null or #lists.isEmpty(services)}" id="empty-row">
+          <td colspan="7">
+            <div class="empty-state">
+              <div class="empty-state-icon"><i class="bi bi-plug"></i></div>
+              <h3>No API Services</h3>
+              <p>Add your first external API to expose it as an MCP tool.</p>
+              <button class="btn btn-primary" onclick="openModal('add-service-modal')" type="button">
+                <i class="bi bi-plus-lg"></i> Add Service
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination" th:if="${totalPages != null and totalPages > 1}">
+    <a class="page-btn" th:href="@{/ui/services(page=${currentPage - 1})}" th:classappend="${currentPage == 0} ? 'disabled' : ''">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <th:block th:each="p : ${#numbers.sequence(0, totalPages - 1)}">
+      <a class="page-btn" th:classappend="${p == currentPage} ? 'active' : ''"
+         th:href="@{/ui/services(page=${p})}" th:text="${p + 1}">1</a>
+    </th:block>
+    <a class="page-btn" th:href="@{/ui/services(page=${currentPage + 1})}" th:classappend="${currentPage == totalPages - 1} ? 'disabled' : ''">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+
+</div><!-- /content -->
+
+<!-- =================== ADD SERVICE MODAL =================== -->
+<div class="modal-overlay" id="add-service-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h2><i class="bi bi-plug" style="color:var(--color-primary)"></i> Add API Service</h2>
+      <button class="modal-close" type="button" onclick="closeModal('add-service-modal')">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <form th:action="@{/ui/services}" method="post">
+      <input type="hidden" name="_csrf" th:value="${_csrf?.token}"/>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Service Name</label>
+            <input type="text" class="form-control" name="name" placeholder="e.g. weather-api" required/>
+            <div class="form-text">Unique identifier used as MCP tool name</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label required">HTTP Method</label>
+            <select class="form-control" name="method" required>
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+              <option value="PUT">PUT</option>
+              <option value="DELETE">DELETE</option>
+              <option value="PATCH">PATCH</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label required">Endpoint URL</label>
+          <input type="url" class="form-control" name="endpoint" placeholder="https://api.example.com/v1/data" required/>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" name="description" rows="2"
+                    placeholder="What does this API do? The agent uses this to decide when to call it."></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Auth Type</label>
+            <select class="form-control" name="authType" id="auth-type-select" onchange="toggleAuthFields()">
+              <option value="NONE">None</option>
+              <option value="API_KEY">API Key (Header)</option>
+              <option value="BEARER">Bearer Token</option>
+              <option value="BASIC">Basic Auth</option>
+            </select>
+          </div>
+          <div class="form-group" id="api-key-field" style="display:none">
+            <label class="form-label">API Key</label>
+            <input type="password" class="form-control" name="apiKey" placeholder="sk-…"/>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Request Schema (JSON)</label>
+          <textarea class="form-control" name="requestSchema" rows="3"
+                    style="font-family:var(--font-mono);font-size:var(--text-xs)"
+                    placeholder='{"city": {"type": "string", "description": "City name"}}'></textarea>
+          <div class="form-text">JSON Schema describing the request parameters the agent should pass</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Response Schema (JSON)</label>
+          <textarea class="form-control" name="responseSchema" rows="3"
+                    style="font-family:var(--font-mono);font-size:var(--text-xs)"
+                    placeholder='{"temperature": "number", "condition": "string"}'></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="toggle-switch">
+            <input type="checkbox" name="enabled" value="true" checked/>
+            <span class="toggle-track"></span>
+            <span class="form-label" style="margin:0">Enable this service</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" type="button" onclick="closeModal('add-service-modal')">Cancel</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Add Service</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- =================== EDIT SERVICE MODAL =================== -->
+<div class="modal-overlay" id="edit-service-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h2><i class="bi bi-pencil" style="color:var(--color-primary)"></i> Edit API Service</h2>
+      <button class="modal-close" type="button" onclick="closeModal('edit-service-modal')">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <form th:action="@{/ui/services/update}" method="post">
+      <input type="hidden" name="_csrf" th:value="${_csrf?.token}"/>
+      <input type="hidden" name="id" id="edit-id"/>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Service Name</label>
+            <input type="text" class="form-control" name="name" id="edit-name" required/>
+          </div>
+          <div class="form-group">
+            <label class="form-label required">HTTP Method</label>
+            <select class="form-control" name="method" id="edit-method" required>
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+              <option value="PUT">PUT</option>
+              <option value="DELETE">DELETE</option>
+              <option value="PATCH">PATCH</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label required">Endpoint URL</label>
+          <input type="url" class="form-control" name="endpoint" id="edit-endpoint" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" name="description" id="edit-description" rows="2"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Auth Type</label>
+            <select class="form-control" name="authType" id="edit-auth-type">
+              <option value="NONE">None</option>
+              <option value="API_KEY">API Key (Header)</option>
+              <option value="BEARER">Bearer Token</option>
+              <option value="BASIC">Basic Auth</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="toggle-switch">
+            <input type="checkbox" name="enabled" value="true" id="edit-enabled"/>
+            <span class="toggle-track"></span>
+            <span class="form-label" style="margin:0">Enabled</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" type="button" onclick="closeModal('edit-service-modal')">Cancel</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<th:block layout:fragment="scripts">
+<script>
+function filterTable() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const method = document.getElementById('method-filter').value.toLowerCase();
+  const enabled = document.getElementById('enabled-filter').value;
+  const rows = document.querySelectorAll('#services-table tbody tr:not(#empty-row)');
+  let visible = 0;
+  rows.forEach(function(row) {
+    const text = row.textContent.toLowerCase();
+    const rowMethod = row.querySelector('td:nth-child(3)')?.textContent.trim().toLowerCase() || '';
+    const isEnabled = row.querySelector('.badge-success') !== null;
+    const matchSearch = !search || text.includes(search);
+    const matchMethod = !method || rowMethod === method;
+    const matchEnabled = !enabled || (enabled === 'true' ? isEnabled : !isEnabled);
+    const show = matchSearch && matchMethod && matchEnabled;
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  const vc = document.getElementById('visible-count');
+  if (vc) vc.textContent = visible;
+}
+
+function toggleAuthFields() {
+  const v = document.getElementById('auth-type-select').value;
+  const f = document.getElementById('api-key-field');
+  if (f) f.style.display = (v !== 'NONE') ? '' : 'none';
+}
+
+function openEditModal(id, name, endpoint, method, description, authType, enabled) {
+  document.getElementById('edit-id').value = id;
+  document.getElementById('edit-name').value = name;
+  document.getElementById('edit-endpoint').value = endpoint;
+  document.getElementById('edit-description').value = description;
+  document.getElementById('edit-enabled').checked = enabled;
+  const methodEl = document.getElementById('edit-method');
+  if (methodEl) { for (let o of methodEl.options) o.selected = o.value === method; }
+  const authEl = document.getElementById('edit-auth-type');
+  if (authEl) { for (let o of authEl.options) o.selected = o.value === authType; }
+  openModal('edit-service-modal');
+}
+
+function deleteService(id, name) {
+  if (!confirmAction('Delete service "' + name + '"? This cannot be undone.')) return;
+  const form = document.createElement('form');
+  form.method = 'post';
+  form.action = '/ui/services/delete';
+  const idInput = document.createElement('input'); idInput.type = 'hidden'; idInput.name = 'id'; idInput.value = id;
+  form.appendChild(idInput);
+  document.body.appendChild(form);
+  form.submit();
+}
+</script>
+</th:block>
+</body>
+</html>

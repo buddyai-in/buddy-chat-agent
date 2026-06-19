@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main-layout}">
+<head><title>Sessions</title></head>
+<body>
+
+<div layout:fragment="breadcrumb">
+  <div class="breadcrumb">
+    <a th:href="@{/ui/dashboard}"><i class="bi bi-house"></i></a>
+    <span class="breadcrumb-sep">/</span>
+    <span class="breadcrumb-current">Sessions</span>
+  </div>
+</div>
+
+<div layout:fragment="content">
+
+  <div class="page-header">
+    <div class="page-header-text">
+      <h1 class="page-title">Sessions</h1>
+      <p class="page-subtitle">View and manage all chat sessions across channels</p>
+    </div>
+    <div class="page-actions">
+      <span style="font-size:var(--text-sm);color:var(--color-text-muted);padding:0 4px">
+        <i class="bi bi-circle-fill" style="font-size:8px;color:var(--color-success)"></i>
+        <span th:text="${activeSessions ?: 0}">0</span> active
+      </span>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <div class="search-input-wrapper">
+      <i class="bi bi-search"></i>
+      <input type="text" class="form-control" id="search-input" placeholder="Search session ID or user…"
+             oninput="filterSessions()"/>
+    </div>
+    <select class="form-control" id="status-filter" onchange="filterSessions()" style="width:auto">
+      <option value="">All States</option>
+      <option value="ACTIVE">Active</option>
+      <option value="COMPLETED">Completed</option>
+      <option value="EXPIRED">Expired</option>
+      <option value="ERROR">Error</option>
+    </select>
+    <select class="form-control" id="channel-filter" onchange="filterSessions()" style="width:auto">
+      <option value="">All Channels</option>
+      <option value="REST">REST</option>
+      <option value="TELEGRAM">Telegram</option>
+      <option value="WHATSAPP">WhatsApp</option>
+      <option value="SLACK">Slack</option>
+    </select>
+    <input type="date" class="form-control" id="date-from" onchange="filterSessions()" style="width:auto" placeholder="From"/>
+    <input type="date" class="form-control" id="date-to" onchange="filterSessions()" style="width:auto" placeholder="To"/>
+    <button class="btn btn-secondary" type="button" onclick="resetFilters()">
+      <i class="bi bi-arrow-counterclockwise"></i> Reset
+    </button>
+  </div>
+
+  <!-- Table -->
+  <div class="table-container">
+    <table class="data-table" id="sessions-table">
+      <thead>
+        <tr>
+          <th>Session ID</th>
+          <th>User</th>
+          <th>Channel</th>
+          <th>State</th>
+          <th>Turns</th>
+          <th>Created</th>
+          <th>Last Active</th>
+          <th style="width:100px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="sess : ${sessions}"
+            style="cursor:pointer"
+            th:onclick="|window.location.href='@{/ui/sessions/}' + '${sess.sessionId}'|">
+          <td onclick="event.stopPropagation()">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="td-mono" style="font-size:11px" th:text="${#strings.abbreviate(sess.sessionId, 18)}">sess-abc</span>
+              <button class="btn btn-ghost btn-icon" style="width:22px;height:22px;padding:0;flex-shrink:0"
+                      title="Copy session ID"
+                      th:onclick="|event.stopPropagation(); copyToClipboard('${sess.sessionId}')|">
+                <i class="bi bi-copy" style="font-size:11px"></i>
+              </button>
+            </div>
+          </td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="width:24px;height:24px;border-radius:50%;background:var(--color-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;flex-shrink:0"
+                   th:text="${#strings.substring(sess.userId ?: 'U', 0, 1).toUpperCase()}">U</div>
+              <span style="font-size:var(--text-sm)" th:text="${sess.userId ?: 'anonymous'}">user</span>
+            </div>
+          </td>
+          <td>
+            <span class="badge"
+                  th:classappend="${sess.channel == 'REST'} ? 'badge-info' : (${sess.channel == 'TELEGRAM'} ? 'badge-primary' : (${sess.channel == 'WHATSAPP'} ? 'badge-success' : 'badge-secondary'))"
+                  th:text="${sess.channel ?: 'REST'}">REST</span>
+          </td>
+          <td>
+            <span class="badge"
+                  th:classappend="${sess.state == 'ACTIVE'} ? 'badge-success' : (${sess.state == 'EXPIRED'} ? 'badge-warning' : (${sess.state == 'ERROR'} ? 'badge-danger' : '')"
+                  th:text="${sess.state ?: 'ACTIVE'}">ACTIVE</span>
+          </td>
+          <td>
+            <span style="font-weight:600;font-size:var(--text-sm)" th:text="${sess.turnCount ?: 0}">0</span>
+            <span style="font-size:var(--text-xs);color:var(--color-text-muted)"> turns</span>
+          </td>
+          <td>
+            <div style="font-size:var(--text-xs);color:var(--color-text-muted)"
+                 th:text="${#temporals.format(sess.createdAt, 'MMM dd, HH:mm')}">Jan 01 00:00</div>
+          </td>
+          <td>
+            <div style="font-size:var(--text-xs);color:var(--color-text-muted)"
+                 th:text="${sess.lastActiveAt != null ? #temporals.format(sess.lastActiveAt, 'MMM dd, HH:mm') : '-'}">-</div>
+          </td>
+          <td onclick="event.stopPropagation()">
+            <div class="td-actions">
+              <a class="btn btn-ghost btn-icon" title="View Details"
+                 th:href="@{/ui/sessions/} + ${sess.sessionId}">
+                <i class="bi bi-eye"></i>
+              </a>
+              <button class="btn btn-ghost btn-icon" title="Close Session" style="color:var(--color-warning)"
+                      th:if="${sess.state == 'ACTIVE'}"
+                      th:onclick="|closeSession('${sess.sessionId}')|">
+                <i class="bi bi-x-circle"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        <tr th:if="${sessions == null or #lists.isEmpty(sessions)}" id="empty-row">
+          <td colspan="8">
+            <div class="empty-state">
+              <div class="empty-state-icon"><i class="bi bi-people"></i></div>
+              <h3>No Sessions Found</h3>
+              <p>Sessions will appear here once users start chatting with the agent.</p>
+              <a th:href="@{/ui/playground}" class="btn btn-primary">
+                <i class="bi bi-chat-dots"></i> Open Playground
+              </a>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination" th:if="${totalPages != null and totalPages > 1}">
+    <a class="page-btn" th:href="@{/ui/sessions(page=${currentPage - 1},status=${filterStatus})}"
+       th:classappend="${currentPage == 0} ? 'disabled' : ''">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <th:block th:each="p : ${#numbers.sequence(0, totalPages - 1)}">
+      <a class="page-btn" th:classappend="${p == currentPage} ? 'active' : ''"
+         th:href="@{/ui/sessions(page=${p},status=${filterStatus})}" th:text="${p + 1}">1</a>
+    </th:block>
+    <a class="page-btn" th:href="@{/ui/sessions(page=${currentPage + 1},status=${filterStatus})}"
+       th:classappend="${currentPage == totalPages - 1} ? 'disabled' : ''">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+    <span class="page-info" th:text="${'Page ' + (currentPage + 1) + ' of ' + totalPages}">Page 1 of 1</span>
+  </div>
+
+</div>
+
+<th:block layout:fragment="scripts">
+<script th:inline="javascript">
+const CLIENT_ID = /*[[${clientId}]]*/ 'default';
+
+function filterSessions() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const status = document.getElementById('status-filter').value.toLowerCase();
+  const channel = document.getElementById('channel-filter').value.toLowerCase();
+  const rows = document.querySelectorAll('#sessions-table tbody tr:not(#empty-row)');
+  rows.forEach(function(row) {
+    const text = row.textContent.toLowerCase();
+    const matchSearch = !search || text.includes(search);
+    const matchStatus = !status || text.includes(status);
+    const matchChannel = !channel || text.includes(channel);
+    row.style.display = (matchSearch && matchStatus && matchChannel) ? '' : 'none';
+  });
+}
+
+function resetFilters() {
+  ['search-input','status-filter','channel-filter','date-from','date-to'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  filterSessions();
+}
+
+function closeSession(sessionId) {
+  if (!confirmAction('Close session ' + sessionId + '? The user will need to start a new session.')) return;
+  fetch('/v1/agent/' + CLIENT_ID + '/session/' + sessionId + '/close', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }
+  })
+  .then(function(res) {
+    if (res.ok) { showToast('Session closed', 'success'); setTimeout(function() { location.reload(); }, 800); }
+    else showToast('Failed to close session', 'error');
+  })
+  .catch(function(e) { showToast('Error: ' + e.message, 'error'); });
+}
+</script>
+</th:block>
+</body>
+</html>
