@@ -1,0 +1,33 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: api-mcp-server
+  ai:
+    mcp:
+      server:
+        name: api-mcp-server
+        version: 1.0.0
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/buddyai}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+
+logging:
+  level:
+    com.buddyai.mcp.api: INFO
+    org.springframework.ai: INFO

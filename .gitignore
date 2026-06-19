@@ -1,0 +1,11 @@
+target/
+*.jar
+*.war
+*.class
+.env
+*.log
+.idea/
+*.iml
+.DS_Store
+.mvn/
+!.mvn/wrapper/

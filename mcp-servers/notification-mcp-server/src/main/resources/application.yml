@@ -1,0 +1,45 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: notification-mcp-server
+  ai:
+    mcp:
+      server:
+        name: notification-mcp-server
+        version: 1.0.0
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+
+notification:
+  email:
+    from: ${EMAIL_FROM:noreply@buddyai.com}
+  telegram:
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+  twilio:
+    account-sid: ${TWILIO_ACCOUNT_SID:}
+    auth-token: ${TWILIO_AUTH_TOKEN:}
+    whatsapp-from: ${TWILIO_WHATSAPP_FROM:}
+  meta:
+    whatsapp:
+      access-token: ${META_WHATSAPP_ACCESS_TOKEN:}
+      phone-number-id: ${META_PHONE_NUMBER_ID:}
+
+logging:
+  level:
+    com.buddyai.mcp.notification: INFO
+    org.springframework.ai: INFO
