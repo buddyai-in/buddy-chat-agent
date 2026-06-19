@@ -1,13 +1,16 @@
 package com.buddyai.agent.pipeline;
 
 import com.buddyai.agent.entity.Slot;
+import com.buddyai.agent.enums.ResponseOutcome;
 import com.buddyai.agent.enums.StateSubType;
 import com.buddyai.agent.enums.StateType;
+import com.buddyai.agent.pipeline.dto.ApiResult;
 import com.buddyai.agent.pipeline.dto.ConversationContext;
 import com.buddyai.agent.pipeline.service.ApiExecutionService;
+import com.buddyai.agent.response.ResponseAgent;
+import com.buddyai.agent.response.ResponseClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -22,7 +25,8 @@ import java.util.Optional;
 public class ContentProcessor {
 
     private final ApiExecutionService apiExecutionService;
-    private final ChatClient chatClient;
+    private final ResponseClassifier responseClassifier;
+    private final ResponseAgent responseAgent;
 
     public void process(ConversationContext ctx) {
         StateType state = ctx.getState();
@@ -87,48 +91,18 @@ public class ContentProcessor {
             }
         }
 
-        String rawResponse;
+        ApiResult result;
         try {
-            rawResponse = apiExecutionService.execute(ctx.getServiceId(), paramMap);
+            result = apiExecutionService.execute(ctx.getServiceId(), paramMap);
         } catch (Exception e) {
             log.error("API execution failed: {}", e.getMessage(), e);
-            ctx.setResponseText("I'm sorry, I encountered an error processing your request. Please try again.");
-            ctx.setState(StateType.EMPTY_STATE);
-            return;
+            result = ApiResult.unreachable(e.getMessage());
         }
 
-        String finalResponse;
+        ResponseOutcome outcome = responseClassifier.classify(result);
+        log.info("API call for service {} returned status={} outcome={}", ctx.getServiceId(),
+                result.reachable() ? result.statusCode() : "N/A", outcome);
 
-        if (ctx.getIntentResponse() != null && !ctx.getIntentResponse().isBlank()) {
-            // Template substitution
-            String template = ctx.getIntentResponse();
-            for (Slot slot : ctx.getSlots()) {
-                if (slot.getSlotValue() != null) {
-                    template = template.replace("{" + slot.getName() + "}", slot.getSlotValue());
-                }
-            }
-            finalResponse = template;
-        } else if (ctx.getSummaryPrompt() != null && !ctx.getSummaryPrompt().isBlank()) {
-            // Use custom summary prompt
-            String summaryInput = ctx.getSummaryPrompt() + "\n\nAPI Response:\n" + rawResponse;
-            finalResponse = chatClient.prompt()
-                    .user(summaryInput)
-                    .call()
-                    .content();
-        } else {
-            // Default LLM summary
-            String defaultPrompt = """
-                Summarize this API response in a friendly, conversational way for the user.
-                Original query: %s
-                Response: %s""".formatted(ctx.getInput(), rawResponse);
-            finalResponse = chatClient.prompt()
-                    .user(defaultPrompt)
-                    .call()
-                    .content();
-        }
-
-        ctx.setResponseText(finalResponse);
-        ctx.setState(StateType.EMPTY_STATE);
-        log.info("API call completed for service {}, response summarized", ctx.getServiceId());
+        responseAgent.generate(ctx, result, outcome);
     }
 }

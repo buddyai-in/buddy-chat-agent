@@ -32,5 +32,12 @@ public class ConversationContext {
     private String intentResponse;
     private String summaryPrompt;
     private String responseText;
+
+    /** Presentation type of the reply: TEXT (default) or DOWNLOADABLE. */
+    private String responseType;
+
+    /** Download URL when the agent produced a file/CSV/media artifact. */
+    private String downloadLink;
+
     private Map<String, Object> metadata;
 }
